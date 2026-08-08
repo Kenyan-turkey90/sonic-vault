@@ -1242,7 +1242,7 @@ fun BottomSheetPlayer(
         }
 
         // Sonic Vault feature: full-screen video playback layer, overlays every player style.
-        if (!state.isCollapsed && !aodModeEnabled) {
+        if (!state.isCollapsed && !aodModeEnabled && currentSong?.song?.isLocal != true) {
             if (showVideo) {
                 VideoPlayerLayer(
                     player = playerConnection.player,
@@ -1251,11 +1251,17 @@ fun BottomSheetPlayer(
                     onTogglePlay = {
                         playerConnection.player.playWhenReady = !playerConnection.player.playWhenReady
                     },
-                    onExitVideo = { showVideo = false },
+                    onExitVideo = {
+                        playerConnection.service.reloadCurrentTrackWithVideoMode(false)
+                        showVideo = false
+                    },
                 )
             } else {
                 FilledTonalIconButton(
-                    onClick = { showVideo = true },
+                    onClick = {
+                        playerConnection.service.reloadCurrentTrackWithVideoMode(true)
+                        showVideo = true
+                    },
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)

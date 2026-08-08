@@ -285,6 +285,9 @@ enum class AudioQuality {
 
 val PlayerStreamClientKey = stringPreferencesKey("playerStreamClient")
 
+/** Global default: play tracks as videos vs songs. A per-track override in the player wins over this. */
+val VideoModeEnabledKey = booleanPreferencesKey("videoModeEnabled")
+
 enum class PlayerStreamClient {
     ANDROID_VR,
     WEB_REMIX,

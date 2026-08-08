@@ -12,7 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import com.sonicvault.app.BuildConfig
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -158,5 +157,6 @@ class IsBackgroundRecognitionEnabledUseCase
                 repository.isBackgroundRecognitionEnabled()
     }
 
-private const val GMS_DISTRIBUTION = "gms"
-private val isBackgroundRecognitionAvailable = BuildConfig.DISTRIBUTION == GMS_DISTRIBUTION
+// Background/device-capture recognition works on all builds — MediaProjection is granted at
+// runtime, so it isn't gated behind any distribution flavor.
+private val isBackgroundRecognitionAvailable = true

@@ -132,6 +132,7 @@ import com.sonicvault.app.cast.CastPlaybackRepository
 import com.sonicvault.app.cast.CastPlaybackRepositoryLocator
 import com.sonicvault.app.constants.AudioNormalizationKey
 import com.sonicvault.app.constants.AudioOffload
+import com.sonicvault.app.constants.VideoModeEnabledKey
 import com.sonicvault.app.constants.AudioQuality
 import com.sonicvault.app.constants.AudioQualityKey
 import com.sonicvault.app.constants.AutoDownloadOnLikeKey
@@ -370,6 +371,39 @@ class MusicService :
     private val extractorPlaybackUrlCache = ConcurrentHashMap<String, AuthScopedCacheValue>()
     private val remotePlaybackTrackingUrlCache = ConcurrentHashMap<String, String>()
     private val contentLengthCache = ConcurrentHashMap<String, Long>()
+
+    private val VideoModeKeySuffix = ".video"
+
+    // Per-track "play as video" override, keyed by base mediaId. Wins over the global default.
+    private val trackVideoModeOverride = ConcurrentHashMap<String, Boolean>()
+
+    private fun resolveTrackVideoMode(baseId: String): Boolean =
+        trackVideoModeOverride[baseId] ?: runBlocking { dataStore.get(VideoModeEnabledKey, false) }
+
+    private fun clearPlaybackResolutionCaches(baseId: String) {
+        val keys = setOf(baseId, baseId + VideoModeKeySuffix)
+        playbackUrlCache.keys.removeAll(keys)
+        extractorPlaybackUrlCache.keys.removeAll(keys)
+        contentLengthCache.keys.removeAll(keys)
+        audioNormalizationFactorCache.keys.removeAll(keys)
+    }
+
+    /** Rebuilds the current track so it resolves as a video (or back to a song). */
+    fun reloadCurrentTrackWithVideoMode(video: Boolean) {
+        val current = player.currentMediaItem ?: return
+        val baseId = current.mediaId
+        if (baseId.isLocalMediaId()) return
+        trackVideoModeOverride[baseId] = video
+        clearPlaybackResolutionCaches(baseId)
+        val newKey = if (video) baseId + VideoModeKeySuffix else baseId
+        val newItem = current.buildUpon().setCustomCacheKey(newKey).build()
+        val index = player.currentMediaItemIndex
+        val positionMs = player.currentPosition
+        player.replaceMediaItem(index, newItem)
+        player.seekTo(index, positionMs)
+        player.prepare()
+        player.play()
+    }
     private val extractorTokenRepository by lazy {
         InMemoryBearerTokenRepository(com.sonicvault.app.BuildConfig.EXTRACTOR_BEARER)
     }
@@ -7141,7 +7175,10 @@ class MusicService :
         if (dataSpec.uri.shouldBypassYouTubeResolver()) {
             return dataSpec
         }
-        val mediaId = dataSpec.key ?: return dataSpec
+        val key = dataSpec.key ?: return dataSpec
+        val isVideoMode = key.endsWith(VideoModeKeySuffix)
+        // mediaId is the YouTube/base id; only the URL/content caches are keyed by the mode-suffixed key.
+        val mediaId = if (isVideoMode) key.removeSuffix(VideoModeKeySuffix) else key
         val storedFormat =
             runBlocking(Dispatchers.IO) {
                 database.format(mediaId).first()
@@ -7150,7 +7187,7 @@ class MusicService :
             audioNormalizationFactorCache[mediaId] = calculateAudioNormalizationFactor(format, normalizeAudio = true)
         }
         val knownContentLength =
-            contentLengthCache[mediaId] ?: storedFormat?.contentLength?.takeIf { it > 0L } ?: runCatching {
+            contentLengthCache[key] ?: storedFormat?.contentLength?.takeIf { it > 0L } ?: runCatching {
                 downloadCache
                     .getContentMetadata(mediaId)
                     .get(ContentMetadata.KEY_CONTENT_LENGTH, -1L)
@@ -7160,7 +7197,7 @@ class MusicService :
                     .get(ContentMetadata.KEY_CONTENT_LENGTH, -1L)
             }.getOrNull()?.takeIf { it > 0L }
 
-        knownContentLength?.takeIf { it > 0L }?.let { contentLengthCache[mediaId] = it }
+        knownContentLength?.takeIf { it > 0L }?.let { contentLengthCache[key] = it }
 
         if (allowCacheShortCircuit) {
             resolveCachedDataSpec(
@@ -7193,7 +7230,7 @@ class MusicService :
         }
 
         val lowDataModeActive = isLowDataModeActive()
-        if (preferredStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR) {
+        if (preferredStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR && !isVideoMode) {
             return resolveSonicVaultExtractorDataSpec(
                 dataSpec = dataSpec,
                 mediaId = mediaId,
@@ -7201,7 +7238,7 @@ class MusicService :
         }
 
         val authFingerprint = YouTube.currentPlaybackAuthState().fingerprint
-        playbackUrlCache[mediaId]
+        playbackUrlCache[key]
             ?.takeUnless { lowDataModeActive }
             ?.takeIf {
                 it.isValidFor(
@@ -7233,6 +7270,7 @@ class MusicService :
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = lowDataModeActive,
+                        video = isVideoMode,
                     )
                 }.recoverCatching { youtubeFailure ->
                     if (youtubeFailure !is YTPlayerUtils.BotDetectionPlaybackException) throw youtubeFailure
@@ -7325,7 +7363,7 @@ class MusicService :
                 .substringAfter("codecs=", "")
                 .removeSurrounding("\"")
                 .substringBefore("\"")
-        resolvedContentLength.takeIf { it > 0L }?.let { contentLengthCache[mediaId] = it }
+        resolvedContentLength.takeIf { it > 0L }?.let { contentLengthCache[key] = it }
 
         Timber
             .tag(
@@ -7348,20 +7386,22 @@ class MusicService :
                 perceptualLoudnessDb = perceptualLoudnessDb,
                 playbackUrl = nonNullPlayback.playbackTracking?.videostatsPlaybackUrl?.baseUrl,
             )
-        val resolvedNormalizationFactor = calculateAudioNormalizationFactor(formatEntity, normalizeAudio = true)
-        audioNormalizationFactorCache[mediaId] = resolvedNormalizationFactor
-        scope.launch {
-            if (currentMediaMetadata.value?.id == mediaId &&
-                dataStore.get(AudioNormalizationKey, true)
-            ) {
-                normalizeFactor.value = resolvedNormalizationFactor
+        if (!isVideoMode) {
+            val resolvedNormalizationFactor = calculateAudioNormalizationFactor(formatEntity, normalizeAudio = true)
+            audioNormalizationFactorCache[mediaId] = resolvedNormalizationFactor
+            scope.launch {
+                if (currentMediaMetadata.value?.id == mediaId &&
+                    dataStore.get(AudioNormalizationKey, true)
+                ) {
+                    normalizeFactor.value = resolvedNormalizationFactor
+                }
             }
-        }
 
-        database.query {
-            upsert(
-                formatEntity,
-            )
+            database.query {
+                upsert(
+                    formatEntity,
+                )
+            }
         }
         scope.launch(Dispatchers.IO) { recoverSong(mediaId, nonNullPlayback) }
 
@@ -7370,7 +7410,7 @@ class MusicService :
         val trackingExpiryMs = System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
 
         if (!lowDataModeActive) {
-            playbackUrlCache[mediaId] =
+            playbackUrlCache[key] =
                 AuthScopedCacheValue(
                     url = streamUrl,
                     expiresAtMs = trackingExpiryMs,

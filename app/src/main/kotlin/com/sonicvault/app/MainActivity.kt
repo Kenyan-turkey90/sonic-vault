@@ -2127,6 +2127,9 @@ class MainActivity : ComponentActivity() {
                                                     searchSource = SearchSource.ONLINE
                                                     openSearch()
                                                 },
+                                                onRecognizeClick = {
+                                                    navController.openMusicRecognition()
+                                                },
                                             )
                                         }
 

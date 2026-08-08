@@ -7,6 +7,7 @@
 
 package com.sonicvault.app.utils
 
+import android.media.MediaCodecList
 import android.net.ConnectivityManager
 import androidx.media3.common.PlaybackException
 import io.ktor.client.plugins.ClientRequestException
@@ -151,6 +152,7 @@ object YTPlayerUtils {
         val audioQuality: AudioQuality,
         val networkMetered: Boolean,
         val authFingerprint: String,
+        val video: Boolean,
     )
 
     private data class CachedPlaybackData(
@@ -446,6 +448,8 @@ object YTPlayerUtils {
         preferredStreamClient: PlayerStreamClient = PlayerStreamClient.WEB_REMIX,
         // if provided, this preference overrides ConnectivityManager.isActiveNetworkMetered
         networkMetered: Boolean? = null,
+        // when true, resolve a combined video+audio stream instead of audio-only
+        video: Boolean = false,
     ): Result<PlaybackData> {
         val isMetered = networkMetered ?: connectivityManager.isActiveNetworkMetered
         val initialKey =
@@ -454,6 +458,7 @@ object YTPlayerUtils {
                 audioQuality = audioQuality,
                 networkMetered = isMetered,
                 authFingerprint = YouTube.currentPlaybackAuthState().fingerprint,
+                video = video,
             )
         getCachedPlaybackData(initialKey)?.let { return Result.success(it) }
         val resolutionMutex =
@@ -465,6 +470,7 @@ object YTPlayerUtils {
                     audioQuality = audioQuality,
                     networkMetered = isMetered,
                     authFingerprint = YouTube.currentPlaybackAuthState().fingerprint,
+                    video = video,
                 )
             getCachedPlaybackData(currentKey)?.let { return@withLock Result.success(it) }
             resolvePlaybackData(
@@ -474,7 +480,10 @@ object YTPlayerUtils {
                 connectivityManager = connectivityManager,
                 preferredStreamClient = preferredStreamClient,
                 networkMetered = isMetered,
-            ).onSuccess { playbackData ->
+                video = video,
+            )
+
+            .onSuccess { playbackData ->
                 cachePlaybackData(
                     key = currentKey.copy(authFingerprint = playbackData.authFingerprint),
                     playbackData = playbackData,
@@ -493,6 +502,7 @@ object YTPlayerUtils {
         connectivityManager: ConnectivityManager,
         preferredStreamClient: PlayerStreamClient,
         networkMetered: Boolean,
+        video: Boolean,
     ): Result<PlaybackData> =
         runCatching {
             val attempts =
@@ -516,6 +526,7 @@ object YTPlayerUtils {
                             connectivityManager = connectivityManager,
                             preferredStreamClient = preferredStreamClient,
                             networkMetered = networkMetered,
+                            video = video,
                         )
                     }
                 if (attemptResult.isSuccess) return@runCatching attemptResult.getOrThrow()
@@ -551,12 +562,14 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         networkMetered: Boolean,
         authFingerprint: String,
+        video: Boolean,
     ): PlaybackDataCacheKey =
         PlaybackDataCacheKey(
             videoId = videoId,
             audioQuality = audioQuality,
             networkMetered = networkMetered,
             authFingerprint = authFingerprint,
+            video = video,
         )
 
     private fun getCachedPlaybackData(key: PlaybackDataCacheKey): PlaybackData? {
@@ -662,6 +675,7 @@ object YTPlayerUtils {
         connectivityManager: ConnectivityManager,
         preferredStreamClient: PlayerStreamClient,
         networkMetered: Boolean?,
+        video: Boolean = false,
     ): PlaybackData {
         Timber.tag(logTag).i("Fetching player response for videoId: $videoId, playlistId: $playlistId")
         val signatureTimestamp = getSignatureTimestampOrNull(videoId)
@@ -988,11 +1002,14 @@ object YTPlayerUtils {
 
             val isMetered = networkMetered ?: connectivityManager.isActiveNetworkMetered
             val candidates =
-                selectAudioFormatCandidates(
-                    streamPlayerResponse,
-                    audioQuality,
-                    isMetered,
-                )
+                if (video) {
+                    selectVideoFormatCandidates(streamPlayerResponse, isMetered)
+                        .ifEmpty {
+                            selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
+                        }
+                } else {
+                    selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
+                }
 
             if (candidates.isEmpty()) continue
 
@@ -1210,6 +1227,40 @@ object YTPlayerUtils {
             isMetered,
         ).firstOrNull()
     }
+
+    /**
+     * Selects a combined (video + audio) format for "play as video" mode. Only progressive
+     * `streamingData.formats` carry both tracks in a single stream; adaptive video-only formats
+     * (which lack an embedded audio track) can't be muxed by a single MediaItem, so they're
+     * ignored. Falls back to audio selection in the caller when this is empty.
+     */
+    private fun selectVideoFormatCandidates(
+        playerResponse: PlayerResponse,
+        networkMetered: Boolean,
+    ): List<PlayerResponse.StreamingData.Format> {
+        val maxHeight = if (networkMetered) 720 else 1080
+        return playerResponse.streamingData
+            ?.formats
+            ?.asSequence()
+            ?.filter { it.width != null && it.height != null }
+            ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
+            ?.filter { it.mimeType.contains("video", ignoreCase = true) }
+            ?.filter { supportsCodecMime(it.mimeType.substringBefore(";")) }
+            ?.filter { (it.height ?: 0) <= maxHeight }
+            ?.sortedWith(
+                compareByDescending<PlayerResponse.StreamingData.Format> { it.height ?: 0 }
+                    .thenByDescending { it.url != null }
+                    .thenByDescending { it.bitrate },
+            )
+            ?.toList()
+            .orEmpty()
+    }
+
+    private fun supportsCodecMime(mime: String): Boolean =
+        runCatching {
+            val codecs = MediaCodecList(MediaCodecList.ALL_CODECS)
+            codecs.codecInfos.any { info -> !info.isEncoder && info.supportedTypes.any { it.equals(mime, ignoreCase = true) } }
+        }.getOrDefault(true)
 
     private fun selectAudioFormatCandidates(
         playerResponse: PlayerResponse,

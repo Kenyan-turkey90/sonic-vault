@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.ShortNavigationBar
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.sonicvault.app.R
 import com.sonicvault.app.constants.NavigationBarHeight
 import com.sonicvault.app.constants.NavigationBarMaxWidth
 import com.sonicvault.app.ui.screens.Screens
@@ -61,6 +63,7 @@ fun FloatingNavigationToolbar(
     isSelected: (Screens) -> Boolean,
     onItemClick: (Screens, Boolean) -> Unit,
     onSearchItemDoubleClick: (() -> Unit)? = null,
+    onRecognizeClick: (() -> Unit)? = null,
 ) {
     val navigationShape =
         remember(isPairedWithMiniPlayer) {
@@ -166,6 +169,23 @@ fun FloatingNavigationToolbar(
                                     )
                                 },
                             )
+                        }
+
+                        if (onRecognizeClick != null) {
+                            Box(
+                                modifier = Modifier.fillMaxHeight(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                IconButton(
+                                    onClick = onRecognizeClick,
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.mic),
+                                        contentDescription = stringResource(R.string.music_recognition),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
