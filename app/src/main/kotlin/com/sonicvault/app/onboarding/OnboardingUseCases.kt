@@ -198,7 +198,7 @@ class BuildOnboardingUiStateUseCase
                         titleResId = R.string.support_development_star,
                         descriptionResId = R.string.onboarding_community_github_desc,
                         iconResId = R.drawable.github,
-                        url = "https://github.com/rukamori/SonicVault",
+                        url = "https://github.com/Kenyan-turkey90/sonic-vault",
                     ),
                     OnboardingCommunityActionUiModel(
                         id = "discord",

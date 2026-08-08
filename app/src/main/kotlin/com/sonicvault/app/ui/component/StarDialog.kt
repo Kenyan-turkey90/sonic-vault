@@ -84,7 +84,7 @@ fun StarDialog(
 
             FilledTonalButton(
                 onClick = {
-                    uriHandler.openUri("https://github.com/rukamori/SonicVault")
+                    uriHandler.openUri("https://github.com/Kenyan-turkey90/sonic-vault")
                     onSupport()
                 },
                 modifier = Modifier.fillMaxWidth(),

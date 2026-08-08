@@ -232,6 +232,10 @@ android {
         release {
             if (hasReleaseSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // No production keystore configured: sign with the debug keystore so release
+                // artifacts are still installable (for self-tests / personal distribution).
+                signingConfig = signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
             isShrinkResources = true

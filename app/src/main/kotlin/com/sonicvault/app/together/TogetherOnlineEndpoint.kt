@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 
 object TogetherOnlineEndpoint {
     private const val EndpointSourceUrl =
-        "https://raw.githubusercontent.com/rukamori/SonicVault/refs/heads/dev/SonicVaultKoiverseServer.txt"
+        "https://raw.githubusercontent.com/Kenyan-turkey90/sonic-vault/refs/heads/dev/SonicVaultKoiverseServer.txt"
 
     private const val CacheTtlMs: Long = 6 * 60 * 60 * 1000L
 

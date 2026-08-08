@@ -55,11 +55,11 @@ private data class ReleasesNetworkResult(
 object Updater {
     private val client = HttpClient()
     private const val ReleaseCacheCheckIntervalMs: Long = 6 * 60 * 60 * 1000L
-    private const val StableReleaseBaseUrl = "https://github.com/rukamori/SonicVault/releases"
+    private const val StableReleaseBaseUrl = "https://github.com/Kenyan-turkey90/sonic-vault/releases"
     private const val CanaryReleaseBaseUrl =
-        "https://github.com/rukamori/canary/releases"
+        "https://github.com/Kenyan-turkey90/sonic-vault/releases"
     private const val CanaryWorkflowRunsUrl =
-        "https://api.github.com/repos/rukamori/SonicVault/actions/workflows/build.yml/runs" +
+        "https://api.github.com/repos/Kenyan-turkey90/sonic-vault/actions/workflows/build.yml/runs" +
             "?branch=dev&status=success&per_page=1&exclude_pull_requests=true"
     var lastCheckTime = -1L
         private set
@@ -98,7 +98,7 @@ object Updater {
 
     private fun workflowArtifactDownloadUrl(): String {
         val artifactUrl =
-            "https://nightly.link/rukamori/SonicVault/workflows/build/dev/${workflowArtifactName()}"
+            "https://nightly.link/Kenyan-turkey90/sonic-vault/workflows/build/dev/${workflowArtifactName()}"
         return if (canDownloadUpdatesDirectly) "$artifactUrl.zip" else artifactUrl
     }
 
@@ -322,7 +322,7 @@ object Updater {
         cachedEtag: String?,
     ): ReleasesNetworkResult {
         val response: HttpResponse =
-            client.get("https://api.github.com/repos/rukamori/SonicVault/releases?per_page=$perPage") {
+            client.get("https://api.github.com/repos/Kenyan-turkey90/sonic-vault/releases?per_page=$perPage") {
                 headers {
                     append("Accept", "application/vnd.github+json")
                     append("User-Agent", "SonicVault")
@@ -394,7 +394,7 @@ object Updater {
 
             val response =
                 client
-                    .get("https://api.github.com/repos/rukamori/SonicVault/commits?sha=$branch&per_page=$count")
+                    .get("https://api.github.com/repos/Kenyan-turkey90/sonic-vault/commits?sha=$branch&per_page=$count")
                     .bodyAsText()
             val jsonArray = JSONArray(response)
             val commits = mutableListOf<GitCommit>()
@@ -619,7 +619,7 @@ object Updater {
         cachedEtag: String?,
     ): ReleasesNetworkResult {
         val response: HttpResponse =
-            client.get("https://api.github.com/repos/rukamori/canary/releases?per_page=$perPage") {
+            client.get("https://api.github.com/repos/Kenyan-turkey90/sonic-vault/releases?per_page=$perPage") {
                 headers {
                     append("Accept", "application/vnd.github+json")
                     append("User-Agent", "SonicVault")
