@@ -382,6 +382,9 @@ class MusicService :
     // Per-track "play as video" override, keyed by base mediaId. Wins over the global default.
     private val trackVideoModeOverride = ConcurrentHashMap<String, Boolean>()
 
+    // baseId -> resolved video-only URL used to build a MergingMediaSource ("" = audio-only fallback).
+    private val mergedVideoUrlCache = ConcurrentHashMap<String, String>()
+
     private fun resolveTrackVideoMode(baseId: String): Boolean =
         trackVideoModeOverride[baseId] ?: runBlocking { dataStore.get(VideoModeEnabledKey, false) }
 
@@ -399,11 +402,41 @@ class MusicService :
         val baseId = current.mediaId
         if (baseId.isLocalMediaId()) return
         trackVideoModeOverride[baseId] = video
-        clearPlaybackResolutionCaches(baseId)
-        val newKey = if (video) baseId + VideoModeKeySuffix else baseId
-        val newItem = current.buildUpon().setCustomCacheKey(newKey).build()
+        if (!video) {
+            mergedVideoUrlCache.remove(baseId)
+            clearPlaybackResolutionCaches(baseId)
+            rebuildCurrentTrack(baseId, videoMode = false)
+            return
+        }
+        // Resolve the video-only stream off the main thread so prepare() never blocks the UI.
+        scope.launch(Dispatchers.IO) {
+            val url =
+                runCatching {
+                    YTPlayerUtils.videoOnlyPlaybackUrl(
+                        videoId = baseId,
+                        connectivityManager = connectivityManager,
+                        preferredStreamClient = preferredStreamClient,
+                    )
+                }.getOrNull()?.getOrNull().orEmpty()
+            clearPlaybackResolutionCaches(baseId)
+            mergedVideoUrlCache[baseId] = url
+            withContext(Dispatchers.Main) {
+                if (player.currentMediaItem?.mediaId == baseId) {
+                    rebuildCurrentTrack(baseId, videoMode = true)
+                }
+            }
+        }
+    }
+
+    private fun rebuildCurrentTrack(
+        baseId: String,
+        videoMode: Boolean,
+    ) {
         val index = player.currentMediaItemIndex
+        val current = player.currentMediaItem ?: return
         val positionMs = player.currentPosition
+        val newKey = if (videoMode) baseId + VideoModeKeySuffix else baseId
+        val newItem = current.buildUpon().setCustomCacheKey(newKey).build()
         player.replaceMediaItem(index, newItem)
         player.seekTo(index, positionMs)
         player.prepare()
@@ -7275,6 +7308,7 @@ class MusicService :
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = lowDataModeActive,
+                        video = isVideoMode,
                     )
                 }.recoverCatching { youtubeFailure ->
                     if (youtubeFailure !is YTPlayerUtils.BotDetectionPlaybackException) throw youtubeFailure
@@ -7642,18 +7676,10 @@ class MusicService :
                 if (cacheKey != null && cacheKey.endsWith(VideoModeKeySuffix)) {
                     val baseId = cacheKey.removeSuffix(VideoModeKeySuffix)
                     val audioSource = delegate.createMediaSource(mediaItem)
-                    val videoUrl =
-                        runCatching {
-                            runBlocking(Dispatchers.IO) {
-                                YTPlayerUtils.videoOnlyPlaybackUrl(
-                                    videoId = baseId,
-                                    connectivityManager = connectivityManager,
-                                    preferredStreamClient = preferredStreamClient,
-                                )
-                            }
-                        }.getOrNull()?.getOrNull()
-
-                    return if (videoUrl != null) {
+                    // The video URL is resolved asynchronously ahead of time and cached here so this
+                    // call never blocks the player/prepare thread.
+                    val videoUrl = mergedVideoUrlCache[baseId]
+                    return if (!videoUrl.isNullOrEmpty()) {
                         val videoDataSource =
                             DefaultDataSource.Factory(this@MusicService, OkHttpDataSource.Factory(mediaOkHttpClient))
                         val videoSource =
@@ -7662,7 +7688,7 @@ class MusicService :
                                 .createMediaSource(MediaItem.fromUri(videoUrl))
                         MergingMediaSource(audioSource, videoSource)
                     } else {
-                        // No playable video stream for this track — fall back to audio only.
+                        // No resolved video stream yet/available — fall back to audio only.
                         audioSource
                     }
                 }
