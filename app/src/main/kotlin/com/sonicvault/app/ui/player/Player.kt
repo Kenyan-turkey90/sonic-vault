@@ -1219,6 +1219,34 @@ fun BottomSheetPlayer(
                 onSliderValueChangeFinished = onSliderValueChangeFinished,
                 currentFormat = if (playerDesignStyle == PlayerDesignStyle.V7) currentFormat else null,
             )
+
+            // Song | Video toggle, placed directly below the now-playing controls.
+            if (!state.isCollapsed && !aodModeEnabled && currentSong?.song?.isLocal != true) {
+                Spacer(Modifier.size(0.dp, 12.dp))
+                Row(
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                            .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    SongVideoSegment(
+                        text = "Song",
+                        selected = !showVideo,
+                        onClick = { showVideo = false },
+                    )
+                    SongVideoSegment(
+                        text = "Video",
+                        selected = showVideo,
+                        onClick = {
+                            playerConnection.service.reloadCurrentTrackWithVideoMode(true)
+                            showVideo = true
+                        },
+                    )
+                }
+            }
         }
 
         if (!state.isCollapsed &&
@@ -1241,45 +1269,24 @@ fun BottomSheetPlayer(
             )
         }
 
-        // Sonic Vault feature: full-screen video playback layer, overlays every player style.
-        if (!state.isCollapsed && !aodModeEnabled && currentSong?.song?.isLocal != true) {
-            if (showVideo) {
-                VideoPlayerLayer(
-                    player = playerConnection.player,
-                    isPlaying = isPlaying,
-                    mediaTitle = mediaMetadata?.title?.toString(),
-                    onTogglePlay = {
-                        playerConnection.player.playWhenReady = !playerConnection.player.playWhenReady
-                    },
-                    onExitVideo = {
-                        playerConnection.service.reloadCurrentTrackWithVideoMode(false)
-                        showVideo = false
-                    },
-                )
-            } else {
-            // Clear "Song | Video" control, placed below the now-playing content.
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 36.dp)
-                            .zIndex(19f)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color(0x99000000))
-                            .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    SongVideoSegment(text = "Song", selected = true, onClick = {})
-                    SongVideoSegment(
-                        text = "Video",
-                        selected = false,
-                        onClick = {
-                            playerConnection.service.reloadCurrentTrackWithVideoMode(true)
-                            showVideo = true
-                        },
-                    )
-                }
-            }
+        // Sonic Vault feature: full-screen video layer when a video is active.
+        if (showVideo &&
+            !state.isCollapsed &&
+            !aodModeEnabled &&
+            currentSong?.song?.isLocal != true
+        ) {
+            VideoPlayerLayer(
+                player = playerConnection.player,
+                isPlaying = isPlaying,
+                mediaTitle = mediaMetadata?.title?.toString(),
+                onTogglePlay = {
+                    playerConnection.player.playWhenReady = !playerConnection.player.playWhenReady
+                },
+                onExitVideo = {
+                    playerConnection.service.reloadCurrentTrackWithVideoMode(false)
+                    showVideo = false
+                },
+            )
         }
 
 // distance
