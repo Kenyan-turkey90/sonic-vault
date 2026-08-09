@@ -419,10 +419,18 @@ class MusicService :
                     )
                 }.getOrNull()?.getOrNull().orEmpty()
             clearPlaybackResolutionCaches(baseId)
-            mergedVideoUrlCache[baseId] = url
+            val hasVideo = url.isNotEmpty()
+            if (hasVideo) {
+                mergedVideoUrlCache[baseId] = url
+            } else {
+                // No usable video stream (or it requires a login confirmation we can't satisfy) —
+                // fall back to the normal audio path so playback keeps working without erroring.
+                mergedVideoUrlCache.remove(baseId)
+                trackVideoModeOverride[baseId] = false
+            }
             withContext(Dispatchers.Main) {
                 if (player.currentMediaItem?.mediaId == baseId) {
-                    rebuildCurrentTrack(baseId, videoMode = true)
+                    rebuildCurrentTrack(baseId, videoMode = hasVideo)
                 }
             }
         }
@@ -7268,7 +7276,7 @@ class MusicService :
         }
 
         val lowDataModeActive = isLowDataModeActive()
-        if (preferredStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR && !isVideoMode) {
+        if (preferredStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR) {
             return resolveSonicVaultExtractorDataSpec(
                 dataSpec = dataSpec,
                 mediaId = mediaId,
