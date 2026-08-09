@@ -102,8 +102,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.graphicsLayer

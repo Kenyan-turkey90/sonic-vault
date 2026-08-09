@@ -105,8 +105,8 @@ android {
     applicationId = "com.sonicvault.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 142
-        versionName = "14.0.3"
+        versionCode = 143
+        versionName = "14.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
