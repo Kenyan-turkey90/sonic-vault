@@ -1257,21 +1257,26 @@ fun BottomSheetPlayer(
                     },
                 )
             } else {
-                FilledTonalIconButton(
-                    onClick = {
-                        playerConnection.service.reloadCurrentTrackWithVideoMode(true)
-                        showVideo = true
-                    },
+            // Clear "Song | Video" control, placed below the now-playing content.
+                Row(
                     modifier =
                         Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 12.dp, end = 12.dp)
-                            .zIndex(19f),
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 36.dp)
+                            .zIndex(19f)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0x99000000))
+                            .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Videocam,
-                        contentDescription = "Play video",
-                        tint = Color.White,
+                    SongVideoSegment(text = "Song", selected = true, onClick = {})
+                    SongVideoSegment(
+                        text = "Video",
+                        selected = false,
+                        onClick = {
+                            playerConnection.service.reloadCurrentTrackWithVideoMode(true)
+                            showVideo = true
+                        },
                     )
                 }
             }
@@ -2532,6 +2537,30 @@ private data class V7PlayerBackdropState(
     val canvasPrimaryUrl: String?,
     val canvasFallbackUrl: String?,
 )
+
+@Composable
+private fun SongVideoSegment(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else Color.White,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

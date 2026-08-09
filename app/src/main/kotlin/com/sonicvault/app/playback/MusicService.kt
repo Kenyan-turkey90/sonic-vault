@@ -82,7 +82,12 @@ import androidx.media3.exoplayer.analytics.PlaybackStatsListener
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
@@ -7270,7 +7275,6 @@ class MusicService :
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = lowDataModeActive,
-                        video = isVideoMode,
                     )
                 }.recoverCatching { youtubeFailure ->
                     if (youtubeFailure !is YTPlayerUtils.BotDetectionPlaybackException) throw youtubeFailure
@@ -7625,11 +7629,62 @@ class MusicService :
             }
         }.getOrDefault(false)
 
-    private fun createMediaSourceFactory() =
-        DefaultMediaSourceFactory(
-            createDataSourceFactory(),
-            DefaultExtractorsFactory(),
-        )
+    private fun createMediaSourceFactory(): MediaSource.Factory =
+        object : MediaSource.Factory {
+            private val delegate =
+                DefaultMediaSourceFactory(
+                    createDataSourceFactory(),
+                    DefaultExtractorsFactory(),
+                )
+
+            override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+                val cacheKey = mediaItem.localConfiguration?.customCacheKey
+                if (cacheKey != null && cacheKey.endsWith(VideoModeKeySuffix)) {
+                    val baseId = cacheKey.removeSuffix(VideoModeKeySuffix)
+                    val audioSource = delegate.createMediaSource(mediaItem)
+                    val videoUrl =
+                        runCatching {
+                            runBlocking(Dispatchers.IO) {
+                                YTPlayerUtils.videoOnlyPlaybackUrl(
+                                    videoId = baseId,
+                                    connectivityManager = connectivityManager,
+                                    preferredStreamClient = preferredStreamClient,
+                                )
+                            }
+                        }.getOrNull()?.getOrNull()
+
+                    return if (videoUrl != null) {
+                        val videoDataSource =
+                            DefaultDataSource.Factory(this@MusicService, OkHttpDataSource.Factory(mediaOkHttpClient))
+                        val videoSource =
+                            ProgressiveMediaSource
+                                .Factory(videoDataSource)
+                                .createMediaSource(MediaItem.fromUri(videoUrl))
+                        MergingMediaSource(audioSource, videoSource)
+                    } else {
+                        // No playable video stream for this track — fall back to audio only.
+                        audioSource
+                    }
+                }
+                return delegate.createMediaSource(mediaItem)
+            }
+
+            override fun getSupportedTypes(): IntArray = delegate.supportedTypes
+
+            override fun setDrmSessionManagerProvider(
+                drmSessionManagerProvider: DrmSessionManagerProvider,
+            ): MediaSource.Factory {
+                delegate.setDrmSessionManagerProvider(drmSessionManagerProvider)
+                return this
+            }
+
+            override fun setLoadErrorHandlingPolicy(
+                loadErrorHandlingPolicy: LoadErrorHandlingPolicy,
+            ): MediaSource.Factory {
+                delegate.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy)
+                return this
+            }
+        }
 
     private class SchemeRoutingDataSource(
         private val cachedFactory: DataSource.Factory,

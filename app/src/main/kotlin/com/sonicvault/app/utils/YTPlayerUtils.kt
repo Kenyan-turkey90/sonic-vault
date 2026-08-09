@@ -396,6 +396,7 @@ object YTPlayerUtils {
     internal fun buildStreamClientOrder(
         preferredStreamClient: PlayerStreamClient,
         authState: PlaybackAuthState,
+        video: Boolean = false,
     ): List<YouTubeClient> {
         val preferredYouTubeClient = resolvePreferredPlaybackClient(preferredStreamClient, authState)
         val lastSuccessfulClient =
@@ -411,17 +412,32 @@ object YTPlayerUtils {
                 STREAM_FALLBACK_CLIENTS.toList()
             }
 
+        val base =
+            buildList {
+                lastSuccessfulClient?.let { add(it) }
+                if (authState.hasPlaybackLoginContext && hasCompleteWebPlaybackPoToken(authState)) {
+                    add(WEB_REMIX)
+                }
+                add(preferredYouTubeClient)
+                addAll(orderedFallbackClients)
+                if (preferredYouTubeClient != MAIN_CLIENT) add(MAIN_CLIENT)
+                if (preferredStreamClient == PlayerStreamClient.WEB_REMIX) {
+                    addAll(STREAM_FALLBACK_CLIENTS)
+                }
+            }.distinct()
+
+        // "Play as video" needs a single stream that carries BOTH audio and video.
+        // The built-for-music clients (WEB_REMIX, ANDROID_MUSIC, IOS, ...) usually return only
+        // separate adaptive tracks (audio-only + video-only DASH), which a single MediaItem
+        // cannot mux. Front-load web-based clients which expose combined progressive formats
+        // (e.g. itag 18/22). Falls back to the normal ordering (and later an audio-only stream
+        // with a clear "no video" state) if the track genuinely has no combined format.
+        if (!video) return base
+
+        val videoPriority = arrayOf(WEB, TVHTML5, ANDROID_MUSIC, MOBILE, WEB_CREATOR, TVHTML5_SIMPLY_EMBEDDED_PLAYER)
         return buildList {
-            lastSuccessfulClient?.let { add(it) }
-            if (authState.hasPlaybackLoginContext && hasCompleteWebPlaybackPoToken(authState)) {
-                add(WEB_REMIX)
-            }
-            add(preferredYouTubeClient)
-            addAll(orderedFallbackClients)
-            if (preferredYouTubeClient != MAIN_CLIENT) add(MAIN_CLIENT)
-            if (preferredStreamClient == PlayerStreamClient.WEB_REMIX) {
-                addAll(STREAM_FALLBACK_CLIENTS)
-            }
+            addAll(videoPriority.filter { it in base })
+            addAll(base.filterNot { it in videoPriority })
         }.distinct()
     }
 
@@ -494,6 +510,23 @@ object YTPlayerUtils {
             }
         }
     }
+
+    /**
+     * Resolves a video-only adaptive stream URL for a track — the video track used in merged
+     * Song/Video playback. Returns failure if the track has no playable video stream.
+     */
+    suspend fun videoOnlyPlaybackUrl(
+        videoId: String,
+        connectivityManager: ConnectivityManager,
+        preferredStreamClient: PlayerStreamClient = PlayerStreamClient.WEB_REMIX,
+    ): Result<String> =
+        playerResponseForPlayback(
+            videoId = videoId,
+            audioQuality = AudioQuality.HIGH,
+            connectivityManager = connectivityManager,
+            preferredStreamClient = preferredStreamClient,
+            video = true,
+        ).map { it.streamUrl }
 
     private suspend fun resolvePlaybackData(
         videoId: String,
@@ -1003,10 +1036,9 @@ object YTPlayerUtils {
             val isMetered = networkMetered ?: connectivityManager.isActiveNetworkMetered
             val candidates =
                 if (video) {
+                    // Video-only stream for the merged video track. No audio fallback here — an
+                    // absent video track is surfaced as a failure so the caller can degrade to audio.
                     selectVideoFormatCandidates(streamPlayerResponse, isMetered)
-                        .ifEmpty {
-                            selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
-                        }
                 } else {
                     selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
                 }
@@ -1229,10 +1261,10 @@ object YTPlayerUtils {
     }
 
     /**
-     * Selects a combined (video + audio) format for "play as video" mode. Only progressive
-     * `streamingData.formats` carry both tracks in a single stream; adaptive video-only formats
-     * (which lack an embedded audio track) can't be muxed by a single MediaItem, so they're
-     * ignored. Falls back to audio selection in the caller when this is empty.
+     * Selects a video-only adaptive format for the video track of "play as video" mode. The
+     * audio track is played from a separate audio-only stream that the service merges with this
+     * via a [androidx.media3.exoplayer.source.MergingMediaSource], so a single stream with both
+     * tracks isn't required.
      */
     private fun selectVideoFormatCandidates(
         playerResponse: PlayerResponse,
@@ -1240,11 +1272,11 @@ object YTPlayerUtils {
     ): List<PlayerResponse.StreamingData.Format> {
         val maxHeight = if (networkMetered) 720 else 1080
         return playerResponse.streamingData
-            ?.formats
+            ?.adaptiveFormats
             ?.asSequence()
-            ?.filter { it.width != null && it.height != null }
-            ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
+            ?.filter { !it.isAudio && it.width != null && it.height != null }
             ?.filter { it.mimeType.contains("video", ignoreCase = true) }
+            ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
             ?.filter { supportsCodecMime(it.mimeType.substringBefore(";")) }
             ?.filter { (it.height ?: 0) <= maxHeight }
             ?.sortedWith(
