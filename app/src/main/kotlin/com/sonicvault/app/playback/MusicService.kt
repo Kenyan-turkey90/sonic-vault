@@ -414,16 +414,31 @@ class MusicService :
         }
         // Resolve a playable video stream off the main thread so prepare() never blocks the UI.
         scope.launch(Dispatchers.IO) {
-            val resolved =
+            val resolutionAttempt =
                 runCatching {
                     YTPlayerUtils.videoOnlyPlaybackUrl(
                         videoId = baseId,
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                     )
-                }.getOrNull()?.getOrNull()?.takeIf { it.url.isNotEmpty() }
+                }
+            val resolved = resolutionAttempt.getOrNull()?.getOrNull()
+            val failure =
+                resolutionAttempt.exceptionOrNull()
+                    ?: resolutionAttempt.getOrNull()?.exceptionOrNull()
+            if (failure != null) {
+                // Surface the real reason instead of silently swallowing it — a resolve/decipher/
+                // 403/login failure is very different from "this track genuinely has no video".
+                Timber.tag(TAG).w(
+                    failure,
+                    "Failed to resolve video stream for %s; falling back to audio-only",
+                    baseId,
+                )
+            } else if (resolved == null || resolved.url.isEmpty()) {
+                Timber.tag(TAG).w("No playable video stream for %s; falling back to audio-only", baseId)
+            }
             clearPlaybackResolutionCaches(baseId)
-            if (resolved != null) {
+            if (resolved != null && resolved.url.isNotEmpty()) {
                 mergedVideoUrlCache[baseId] = resolved.url
                 mergedVideoCombinedCache[baseId] = resolved.combined
             } else {
@@ -435,7 +450,7 @@ class MusicService :
             }
             withContext(Dispatchers.Main) {
                 if (player.currentMediaItem?.mediaId == baseId) {
-                    rebuildCurrentTrack(baseId, videoMode = resolved != null)
+                    rebuildCurrentTrack(baseId, videoMode = resolved != null && resolved.url.isNotEmpty())
                 }
             }
         }

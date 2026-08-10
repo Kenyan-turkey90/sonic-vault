@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.ui.compose.PlayerSurface
@@ -58,12 +59,23 @@ internal fun VideoPlayerLayer(
     modifier: Modifier = Modifier,
 ) {
     var hasVideoTrack by remember { mutableStateOf(false) }
+    var videoError by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(player) {
         val listener =
             object : Player.Listener {
                 override fun onVideoSizeChanged(videoSize: VideoSize) {
                     hasVideoTrack = videoSize.width > 0 && videoSize.height > 0
+                    if (hasVideoTrack) videoError = null
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    // Don't mask a real load/decoder failure as "no video track".
+                    if (player.videoSize.width == 0 && player.videoSize.height == 0) {
+                        videoError =
+                            error.errorCodeName.replace('_', ' ')
+                                .let { "Video failed to load ($it)" }
+                    }
                 }
             }
         player.addListener(listener)
@@ -98,7 +110,7 @@ internal fun VideoPlayerLayer(
                     )
                     Spacer(Modifier.width(0.dp))
                     Text(
-                        text = "No video track in this stream",
+                        text = videoError ?: "No video track in this stream",
                         color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 12.dp),

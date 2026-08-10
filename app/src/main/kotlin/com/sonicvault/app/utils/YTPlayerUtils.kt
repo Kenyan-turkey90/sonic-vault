@@ -426,15 +426,27 @@ object YTPlayerUtils {
                 }
             }.distinct()
 
-        // "Play as video" needs a single stream that carries BOTH audio and video.
-        // The built-for-music clients (WEB_REMIX, ANDROID_MUSIC, IOS, ...) usually return only
-        // separate adaptive tracks (audio-only + video-only DASH), which a single MediaItem
-        // cannot mux. Front-load web-based clients which expose combined progressive formats
-        // (e.g. itag 18/22). Falls back to the normal ordering (and later an audio-only stream
-        // with a clear "no video" state) if the track genuinely has no combined format.
+        // "Play as video" ideally uses a single stream that carries BOTH audio and video
+        // (combined itag 18/22), which is exposed by web-type clients. But those combined formats
+        // are Ciphered and need working JS decipher + po_token, and TVHTML5/WEB_CREATOR are
+        // login-gated (skipped for guests). Meanwhile the native/mobile clients return direct,
+        // unciphered adaptive video-only tracks that merge cleanly with the audio stream.
+        //
+        // Order deliberately: WEB_REMIX first (its player response is already reused for metadata,
+        // so it costs no extra request and may carry combined formats), then mobile/native clients
+        // with direct URLs, and only then the ciphered WEB/TV clients as a bonus combined source.
         if (!video) return base
 
-        val videoPriority = arrayOf(WEB, TVHTML5, ANDROID_MUSIC, MOBILE, WEB_CREATOR, TVHTML5_SIMPLY_EMBEDDED_PLAYER)
+        val videoPriority =
+            arrayOf(
+                WEB_REMIX,
+                MOBILE,
+                ANDROID_MUSIC,
+                WEB,
+                TVHTML5,
+                WEB_CREATOR,
+                TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+            )
         return buildList {
             addAll(videoPriority.filter { it in base })
             addAll(base.filterNot { it in videoPriority })
@@ -538,11 +550,49 @@ object YTPlayerUtils {
             )
         }
 
-    private fun String.hasEmbeddedAudioCodec(): Boolean =
-        contains("mp4a", ignoreCase = true) ||
-            contains("opus", ignoreCase = true) ||
-            contains("ac-3", ignoreCase = true) ||
-            contains("mp3", ignoreCase = true)
+    private fun String.hasEmbeddedAudioCodec(): Boolean {
+        // A combined/progressive format (itag 18/22) lists BOTH a video and an audio codec in the
+        // `codecs="..."` attribute; a video-only adaptive format lists only the video codec. Parse
+        // the codec list properly instead of substring-sniffing so a video-only codec string can't
+        // be misclassified as "combined".
+        val codecs =
+            Regex("""codecs="([^"]+)"""")
+                .find(this)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.split(",")
+                ?.map { it.trim().lowercase(Locale.US) }
+                .orEmpty()
+        if (codecs.isEmpty()) {
+            // Fallback for responses without a codecs attribute: detect an embedded audio container.
+            return contains("mp4a", ignoreCase = true) ||
+                contains("opus", ignoreCase = true) ||
+                contains("ac-3", ignoreCase = true) ||
+                contains("mp3", ignoreCase = true)
+        }
+        val hasVideo =
+            codecs.any {
+                it.startsWith("avc1") ||
+                    it.startsWith("hvc1") ||
+                    it.startsWith("hev1") ||
+                    it.startsWith("av01") ||
+                    it.startsWith("vp8") ||
+                    it.startsWith("vp9")
+            }
+        val hasAudio =
+            codecs.any {
+                it.startsWith("mp4a") ||
+                    it.startsWith("opus") ||
+                    it.startsWith("ac-3") ||
+                    it.startsWith("ec-3") ||
+                    it == "mp3" ||
+                    it == "flac" ||
+                    it.startsWith("silk") ||
+                    it == "vorbis" ||
+                    it == ".mp3"
+            }
+        return hasVideo && hasAudio
+    }
 
     private suspend fun resolvePlaybackData(
         videoId: String,
@@ -1053,12 +1103,14 @@ object YTPlayerUtils {
             val candidates =
                 if (video) {
                     // Prefer a single combined progressive stream (itag 18/22) that carries audio +
-                    // video, so playback works from one source. Fall back to a video-only adaptive
-                    // stream (merged with the normal audio stream downstream) when none exists.
-                    selectCombinedFormatCandidates(streamPlayerResponse, isMetered)
-                        .ifEmpty {
-                            selectVideoFormatCandidates(streamPlayerResponse, isMetered)
-                        }
+                    // video, so playback works from one source. When a combined candidate exists but
+                    // fails to resolve (ciphered/decipher/403), fall through to a video-only adaptive
+                    // stream for the SAME client (merged with the normal audio stream downstream)
+                    // instead of abandoning the client. distinctBy(itag) guards against overlap since
+                    // `formats` and `adaptiveFormats` are normally disjoint.
+                    (selectCombinedFormatCandidates(streamPlayerResponse, isMetered) +
+                        selectVideoFormatCandidates(streamPlayerResponse, isMetered))
+                        .distinctBy { it.itag }
                 } else {
                     selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
                 }
@@ -1302,7 +1354,7 @@ object YTPlayerUtils {
             ?.filter { it.width != null && it.height != null }
             ?.filter { it.mimeType.contains("video", ignoreCase = true) }
             ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
-            ?.filter { supportsCodecMime(it.mimeType.substringBefore(";")) }
+            ?.filter { supportsCodecMime(it.mimeType) }
             ?.filter { (it.height ?: 0) <= maxHeight }
             ?.sortedWith(
                 compareBy<PlayerResponse.StreamingData.Format> {
@@ -1326,22 +1378,60 @@ object YTPlayerUtils {
             ?.filter { !it.isAudio && it.width != null && it.height != null }
             ?.filter { it.mimeType.contains("video", ignoreCase = true) }
             ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
-            ?.filter { supportsCodecMime(it.mimeType.substringBefore(";")) }
+            ?.filter { supportsCodecMime(it.mimeType) }
             ?.filter { (it.height ?: 0) <= maxHeight }
             ?.sortedWith(
-                compareByDescending<PlayerResponse.StreamingData.Format> { it.height ?: 0 }
-                    .thenByDescending { it.url != null }
+                compareBy<PlayerResponse.StreamingData.Format> {
+                    // Prefer universally-decodable H.264 (avc1) over VP9/AV1/HEVC so a video-only
+                    // stream actually renders on devices without those decoder extensions.
+                    if (it.mimeType.contains("avc1", ignoreCase = true)) 0 else 1
+                }.thenByDescending { it.url != null }
+                    .thenByDescending { it.height ?: 0 }
                     .thenByDescending { it.bitrate },
             )
             ?.toList()
             .orEmpty()
     }
 
-    private fun supportsCodecMime(mime: String): Boolean =
-        runCatching {
+    /**
+     * Whether the device can decode the first codec listed in a YouTube format's `mimeType`
+     * (e.g. `video/mp4; codecs="avc1.64001f,mp4a.40.2"`).
+     *
+     * The container mime (`video/mp4`) is NOT a decoder type — MediaCodecList only advertises
+     * codec mimes (`video/avc`, `video/hevc`, `video/x-vnd.on2.vp9`, ...). Testing the container
+     * would empty every video candidate list on every device, which silently broke "play as video"
+     * (audio was unaffected because the audio path never ran this filter). We therefore derive the
+     * actual codec mime from the `codecs="..."` attribute, and when it can't be derived we default
+     * to ALLOWING the candidate — ExoPlayer's renderer + DefaultRenderersFactory handle capability
+     * selection and surface real failures instead of silently filtering the feature out.
+     */
+    private fun supportsCodecMime(mimeType: String): Boolean {
+        val codecMime = extractCodec(mimeType)?.let(::codecToMimeType) ?: return true
+        return runCatching {
             val codecs = MediaCodecList(MediaCodecList.ALL_CODECS)
-            codecs.codecInfos.any { info -> !info.isEncoder && info.supportedTypes.any { it.equals(mime, ignoreCase = true) } }
+            codecs.codecInfos.any { info -> !info.isEncoder && info.supportedTypes.any { it.equals(codecMime, ignoreCase = true) } }
         }.getOrDefault(true)
+    }
+
+    private fun codecToMimeType(codec: String): String? {
+        val normalized = codec.lowercase(Locale.US)
+        return when {
+            normalized.startsWith("avc1") || normalized == "avc" -> "video/avc"
+            normalized.startsWith("hvc1") || normalized.startsWith("hev1") ||
+                normalized == "hvc" || normalized == "hev" -> "video/hevc"
+            normalized.startsWith("av01") -> "video/av01"
+            normalized.startsWith("vp9") || normalized == "vp09" -> "video/x-vnd.on2.vp9"
+            normalized.startsWith("vp8") -> "video/x-vnd.on2.vp8"
+            normalized.startsWith("mp4a") || normalized == "mp4a" -> "audio/mp4a-latm"
+            normalized == "opus" -> "audio/opus"
+            normalized == "flac" -> "audio/flac"
+            normalized == "vrbs" || normalized == "vorbis" -> "audio/vorbis"
+            normalized.startsWith("ac-3") -> "audio/ac3"
+            normalized.startsWith("ec-3") -> "audio/eac3"
+            normalized == "mp3" || normalized == ".mp3" -> "audio/mpeg"
+            else -> null
+        }
+    }
 
     private fun selectAudioFormatCandidates(
         playerResponse: PlayerResponse,
