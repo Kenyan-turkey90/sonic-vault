@@ -1100,20 +1100,23 @@ object YTPlayerUtils {
             }
 
             val isMetered = networkMetered ?: connectivityManager.isActiveNetworkMetered
-            val candidates =
-                if (video) {
-                    // Prefer a single combined progressive stream (itag 18/22) that carries audio +
-                    // video, so playback works from one source. When a combined candidate exists but
-                    // fails to resolve (ciphered/decipher/403), fall through to a video-only adaptive
-                    // stream for the SAME client (merged with the normal audio stream downstream)
-                    // instead of abandoning the client. distinctBy(itag) guards against overlap since
-                    // `formats` and `adaptiveFormats` are normally disjoint.
-                    (selectCombinedFormatCandidates(streamPlayerResponse, isMetered) +
-                        selectVideoFormatCandidates(streamPlayerResponse, isMetered))
-                        .distinctBy { it.itag }
-                } else {
-                    selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
-                }
+            val candidates: List<PlayerResponse.StreamingData.Format>
+            if (video) {
+                val combined = selectCombinedFormatCandidates(streamPlayerResponse, isMetered)
+                val videoOnly = selectVideoFormatCandidates(streamPlayerResponse, isMetered)
+                Timber.tag(logTag).i(
+                    "Video candidate audit for %s: combined=%d video-only=%d (response formats=%d adaptive=%d status=%s)",
+                    describeClient(client),
+                    combined.size,
+                    videoOnly.size,
+                    streamPlayerResponse.streamingData?.formats?.size ?: 0,
+                    streamPlayerResponse.streamingData?.adaptiveFormats?.size ?: 0,
+                    streamPlayerResponse.playabilityStatus.status,
+                )
+                candidates = (combined + videoOnly).distinctBy { it.itag }
+            } else {
+                candidates = selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
+            }
 
             if (candidates.isEmpty()) continue
 
@@ -1235,9 +1238,7 @@ object YTPlayerUtils {
                 .tag(
                     logTag,
                 ).e(
-                    "Could not find suitable format for quality: $audioQuality. Available formats from last client: ${streamPlayerResponse.streamingData?.adaptiveFormats?.filter {
-                        it.isAudio
-                    }?.map { "${it.mimeType} @ ${it.bitrate}bps (itag: ${it.itag})" }}",
+                    "Could not find suitable format for quality: $audioQuality. From last client: combined=${streamPlayerResponse.streamingData?.formats?.size ?: 0} video-only=${streamPlayerResponse.streamingData?.adaptiveFormats?.filter { it.width != null && !it.isAudio }?.size ?: 0} audio=${streamPlayerResponse.streamingData?.adaptiveFormats?.filter { it.isAudio }?.size ?: 0}. All video formats: ${streamPlayerResponse.streamingData?.formats?.filter { it.width != null }?.map { "${it.mimeType} h=${it.height} itag=${it.itag} direct=${it.url != null} ciphered=${it.signatureCipher != null || it.cipher != null}" }?.plus(streamPlayerResponse.streamingData?.adaptiveFormats?.filter { it.width != null && !it.isAudio }?.map { "${it.mimeType} h=${it.height} itag=${it.itag} direct=${it.url != null} ciphered=${it.signatureCipher != null || it.cipher != null}" }.orEmpty())}",
                 )
             throw Exception("Could not find format for quality: $audioQuality")
         }
