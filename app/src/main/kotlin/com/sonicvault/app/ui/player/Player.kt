@@ -822,10 +822,6 @@ fun BottomSheetPlayer(
     var isLyricsScreenVisible by rememberSaveable {
         mutableStateOf(false)
     }
-    // Sonic Vault feature: full-screen video playback toggle state.
-    var showVideo by rememberSaveable {
-        mutableStateOf(false)
-    }
     val openQueue =
         remember(state, queueSheetState) {
             {
@@ -1218,34 +1214,7 @@ fun BottomSheetPlayer(
                 currentFormat = if (playerDesignStyle == PlayerDesignStyle.V7) currentFormat else null,
             )
 
-            // Song | Video toggle, placed directly below the now-playing controls.
-            if (!state.isCollapsed && !aodModeEnabled && currentSong?.song?.isLocal != true) {
-                Spacer(Modifier.size(0.dp, 12.dp))
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                            .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    SongVideoSegment(
-                        text = "Song",
-                        selected = !showVideo,
-                        onClick = { showVideo = false },
-                    )
-                    SongVideoSegment(
-                        text = "Video",
-                        selected = showVideo,
-                        onClick = {
-                            playerConnection.service.reloadCurrentTrackWithVideoMode(true)
-                            showVideo = true
-                        },
-                    )
-                }
             }
-        }
 
         if (!state.isCollapsed &&
             !aodModeEnabled &&
@@ -1267,30 +1236,7 @@ fun BottomSheetPlayer(
             )
         }
 
-        // Sonic Vault feature: full-screen video layer when a video is active.
-        if (showVideo &&
-            !state.isCollapsed &&
-            !aodModeEnabled &&
-            currentSong?.song?.isLocal != true
-        ) {
-            VideoPlayerLayer(
-                player = playerConnection.player,
-                isPlaying = isPlaying,
-                mediaTitle = mediaMetadata?.title?.toString(),
-                onTogglePlay = {
-                    playerConnection.player.playWhenReady = !playerConnection.player.playWhenReady
-                },
-                onExitVideo = {
-                    playerConnection.service.reloadCurrentTrackWithVideoMode(false)
-                    showVideo = false
-                },
-                onRetryVideo = {
-                    // Re-resolve the video stream fresh (invalidate stale/403'd URL) and retry.
-                    playerConnection.service.reloadCurrentTrackWithVideoMode(true)
-                },
-            )
-        }
-
+        
 // distance
 
         when (LocalConfiguration.current.orientation) {
@@ -2546,30 +2492,6 @@ private data class V7PlayerBackdropState(
     val canvasPrimaryUrl: String?,
     val canvasFallbackUrl: String?,
 )
-
-@Composable
-private fun SongVideoSegment(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(50))
-                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else Color.White,
-            style = MaterialTheme.typography.labelLarge,
-        )
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
