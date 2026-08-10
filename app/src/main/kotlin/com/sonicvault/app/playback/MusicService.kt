@@ -382,8 +382,10 @@ class MusicService :
     // Per-track "play as video" override, keyed by base mediaId. Wins over the global default.
     private val trackVideoModeOverride = ConcurrentHashMap<String, Boolean>()
 
-    // baseId -> resolved video-only URL used to build a MergingMediaSource ("" = audio-only fallback).
+    // baseId -> resolved video URL used to build the video source ("" = audio-only fallback).
     private val mergedVideoUrlCache = ConcurrentHashMap<String, String>()
+    // baseId -> true when the cached video URL is a combined stream (carries audio too).
+    private val mergedVideoCombinedCache = ConcurrentHashMap<String, Boolean>()
 
     private fun resolveTrackVideoMode(baseId: String): Boolean =
         trackVideoModeOverride[baseId] ?: runBlocking { dataStore.get(VideoModeEnabledKey, false) }
@@ -394,6 +396,7 @@ class MusicService :
         extractorPlaybackUrlCache.keys.removeAll(keys)
         contentLengthCache.keys.removeAll(keys)
         audioNormalizationFactorCache.keys.removeAll(keys)
+        mergedVideoCombinedCache.keys.removeAll(keys)
     }
 
     /** Rebuilds the current track so it resolves as a video (or back to a song). */
@@ -404,33 +407,35 @@ class MusicService :
         trackVideoModeOverride[baseId] = video
         if (!video) {
             mergedVideoUrlCache.remove(baseId)
+            mergedVideoCombinedCache.remove(baseId)
             clearPlaybackResolutionCaches(baseId)
             rebuildCurrentTrack(baseId, videoMode = false)
             return
         }
-        // Resolve the video-only stream off the main thread so prepare() never blocks the UI.
+        // Resolve a playable video stream off the main thread so prepare() never blocks the UI.
         scope.launch(Dispatchers.IO) {
-            val url =
+            val resolved =
                 runCatching {
                     YTPlayerUtils.videoOnlyPlaybackUrl(
                         videoId = baseId,
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                     )
-                }.getOrNull()?.getOrNull().orEmpty()
+                }.getOrNull()?.getOrNull()?.takeIf { it.url.isNotEmpty() }
             clearPlaybackResolutionCaches(baseId)
-            val hasVideo = url.isNotEmpty()
-            if (hasVideo) {
-                mergedVideoUrlCache[baseId] = url
+            if (resolved != null) {
+                mergedVideoUrlCache[baseId] = resolved.url
+                mergedVideoCombinedCache[baseId] = resolved.combined
             } else {
                 // No usable video stream (or it requires a login confirmation we can't satisfy) —
                 // fall back to the normal audio path so playback keeps working without erroring.
                 mergedVideoUrlCache.remove(baseId)
+                mergedVideoCombinedCache.remove(baseId)
                 trackVideoModeOverride[baseId] = false
             }
             withContext(Dispatchers.Main) {
                 if (player.currentMediaItem?.mediaId == baseId) {
-                    rebuildCurrentTrack(baseId, videoMode = hasVideo)
+                    rebuildCurrentTrack(baseId, videoMode = resolved != null)
                 }
             }
         }
@@ -7316,7 +7321,6 @@ class MusicService :
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = lowDataModeActive,
-                        video = isVideoMode,
                     )
                 }.recoverCatching { youtubeFailure ->
                     if (youtubeFailure !is YTPlayerUtils.BotDetectionPlaybackException) throw youtubeFailure
@@ -7683,22 +7687,25 @@ class MusicService :
                 val cacheKey = mediaItem.localConfiguration?.customCacheKey
                 if (cacheKey != null && cacheKey.endsWith(VideoModeKeySuffix)) {
                     val baseId = cacheKey.removeSuffix(VideoModeKeySuffix)
-                    val audioSource = delegate.createMediaSource(mediaItem)
-                    // The video URL is resolved asynchronously ahead of time and cached here so this
-                    // call never blocks the player/prepare thread.
+                    // The video URL is resolved asynchronously and cached, so this never blocks prepare.
                     val videoUrl = mergedVideoUrlCache[baseId]
-                    return if (!videoUrl.isNullOrEmpty()) {
+                    if (!videoUrl.isNullOrEmpty()) {
                         val videoDataSource =
                             DefaultDataSource.Factory(this@MusicService, OkHttpDataSource.Factory(mediaOkHttpClient))
                         val videoSource =
                             ProgressiveMediaSource
                                 .Factory(videoDataSource)
                                 .createMediaSource(MediaItem.fromUri(videoUrl))
-                        MergingMediaSource(audioSource, videoSource)
-                    } else {
-                        // No resolved video stream yet/available — fall back to audio only.
-                        audioSource
+                        if (mergedVideoCombinedCache[baseId] == true) {
+                            // Combined stream carries audio + video — play it directly.
+                            return videoSource
+                        }
+                        // Video-only stream — merge with the normal audio source.
+                        val audioSource = delegate.createMediaSource(mediaItem)
+                        return MergingMediaSource(audioSource, videoSource)
                     }
+                    // No resolved video stream available — fall back to audio only.
+                    return delegate.createMediaSource(mediaItem)
                 }
                 return delegate.createMediaSource(mediaItem)
             }

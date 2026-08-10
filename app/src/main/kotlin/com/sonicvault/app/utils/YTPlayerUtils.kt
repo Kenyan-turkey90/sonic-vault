@@ -515,18 +515,34 @@ object YTPlayerUtils {
      * Resolves a video-only adaptive stream URL for a track — the video track used in merged
      * Song/Video playback. Returns failure if the track has no playable video stream.
      */
+    data class VideoPlaybackResult(
+        val url: String,
+        val combined: Boolean,
+    )
+
     suspend fun videoOnlyPlaybackUrl(
         videoId: String,
         connectivityManager: ConnectivityManager,
         preferredStreamClient: PlayerStreamClient = PlayerStreamClient.WEB_REMIX,
-    ): Result<String> =
+    ): Result<VideoPlaybackResult> =
         playerResponseForPlayback(
             videoId = videoId,
             audioQuality = AudioQuality.HIGH,
             connectivityManager = connectivityManager,
             preferredStreamClient = preferredStreamClient,
             video = true,
-        ).map { it.streamUrl }
+        ).map { playback ->
+            VideoPlaybackResult(
+                url = playback.streamUrl,
+                combined = playback.format.mimeType.hasEmbeddedAudioCodec(),
+            )
+        }
+
+    private fun String.hasEmbeddedAudioCodec(): Boolean =
+        contains("mp4a", ignoreCase = true) ||
+            contains("opus", ignoreCase = true) ||
+            contains("ac-3", ignoreCase = true) ||
+            contains("mp3", ignoreCase = true)
 
     private suspend fun resolvePlaybackData(
         videoId: String,
@@ -835,7 +851,7 @@ object YTPlayerUtils {
                 ?.times(1000L)
 
         val streamClients =
-            buildStreamClientOrder(preferredStreamClient, authState).filterNot { client ->
+            buildStreamClientOrder(preferredStreamClient, authState, video).filterNot { client ->
                 val blocked =
                     isStreamClientTemporarilyBlocked(
                         videoId = videoId,
@@ -1036,9 +1052,13 @@ object YTPlayerUtils {
             val isMetered = networkMetered ?: connectivityManager.isActiveNetworkMetered
             val candidates =
                 if (video) {
-                    // Video-only stream for the merged video track. No audio fallback here — an
-                    // absent video track is surfaced as a failure so the caller can degrade to audio.
-                    selectVideoFormatCandidates(streamPlayerResponse, isMetered)
+                    // Prefer a single combined progressive stream (itag 18/22) that carries audio +
+                    // video, so playback works from one source. Fall back to a video-only adaptive
+                    // stream (merged with the normal audio stream downstream) when none exists.
+                    selectCombinedFormatCandidates(streamPlayerResponse, isMetered)
+                        .ifEmpty {
+                            selectVideoFormatCandidates(streamPlayerResponse, isMetered)
+                        }
                 } else {
                     selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
                 }
@@ -1266,6 +1286,35 @@ object YTPlayerUtils {
      * via a [androidx.media3.exoplayer.source.MergingMediaSource], so a single stream with both
      * tracks isn't required.
      */
+    /**
+     * Combined progressive formats (`streamingData.formats`, e.g. itag 18/22) carry BOTH audio and
+     * video in a single MP4 — the most reliable way to play a video with sound. Lower-resolution
+     * H.264 is preferred because every device can decode it.
+     */
+    private fun selectCombinedFormatCandidates(
+        playerResponse: PlayerResponse,
+        networkMetered: Boolean,
+    ): List<PlayerResponse.StreamingData.Format> {
+        val maxHeight = if (networkMetered) 720 else 1080
+        return playerResponse.streamingData
+            ?.formats
+            ?.asSequence()
+            ?.filter { it.width != null && it.height != null }
+            ?.filter { it.mimeType.contains("video", ignoreCase = true) }
+            ?.filter { it.url != null || it.signatureCipher != null || it.cipher != null }
+            ?.filter { supportsCodecMime(it.mimeType.substringBefore(";")) }
+            ?.filter { (it.height ?: 0) <= maxHeight }
+            ?.sortedWith(
+                compareBy<PlayerResponse.StreamingData.Format> {
+                    if (it.mimeType.contains("avc1", ignoreCase = true)) 0 else 1
+                }.thenBy { it.height ?: 0 }
+                    .thenByDescending { it.url != null }
+                    .thenByDescending { it.bitrate },
+            )
+            ?.toList()
+            .orEmpty()
+    }
+
     private fun selectVideoFormatCandidates(
         playerResponse: PlayerResponse,
         networkMetered: Boolean,
