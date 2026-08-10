@@ -1284,6 +1284,10 @@ fun BottomSheetPlayer(
                     playerConnection.service.reloadCurrentTrackWithVideoMode(false)
                     showVideo = false
                 },
+                onRetryVideo = {
+                    // Re-resolve the video stream fresh (invalidate stale/403'd URL) and retry.
+                    playerConnection.service.reloadCurrentTrackWithVideoMode(true)
+                },
             )
         }
 

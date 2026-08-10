@@ -405,6 +405,11 @@ class MusicService :
         val baseId = current.mediaId
         if (baseId.isLocalMediaId()) return
         trackVideoModeOverride[baseId] = video
+        if (video) {
+            // A stale/403'd stream URL must never be replayed on a video retry: invalidate the
+            // resolution+stream caches so every video-mode resolve fetches a fresh URL.
+            YTPlayerUtils.invalidateCachedStreamUrls(baseId)
+        }
         if (!video) {
             mergedVideoUrlCache.remove(baseId)
             mergedVideoCombinedCache.remove(baseId)

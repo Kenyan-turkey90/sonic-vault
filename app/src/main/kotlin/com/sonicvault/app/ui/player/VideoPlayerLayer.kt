@@ -56,6 +56,7 @@ internal fun VideoPlayerLayer(
     mediaTitle: String?,
     onTogglePlay: () -> Unit,
     onExitVideo: () -> Unit,
+    onRetryVideo: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var hasVideoTrack by remember { mutableStateOf(false) }
@@ -118,6 +119,11 @@ internal fun VideoPlayerLayer(
                     Spacer(Modifier.width(0.dp))
                     TextButton(onClick = onExitVideo) {
                         Text("Return to music", color = Color.White)
+                    }
+                    if (videoError != null && onRetryVideo != null) {
+                        TextButton(onClick = onRetryVideo) {
+                            Text("Retry video", color = Color.White)
+                        }
                     }
                 }
             }

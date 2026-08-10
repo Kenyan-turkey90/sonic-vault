@@ -441,6 +441,8 @@ object YTPlayerUtils {
             arrayOf(
                 WEB_REMIX,
                 MOBILE,
+                IOS,
+                IOS_MUSIC,
                 ANDROID_MUSIC,
                 WEB,
                 TVHTML5,
