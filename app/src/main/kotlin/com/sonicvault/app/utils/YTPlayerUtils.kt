@@ -1104,7 +1104,7 @@ object YTPlayerUtils {
             if (video) {
                 val combined = selectCombinedFormatCandidates(streamPlayerResponse, isMetered)
                 val videoOnly = selectVideoFormatCandidates(streamPlayerResponse, isMetered)
-                Timber.tag(logTag).i(
+                Timber.tag(logTag).w(
                     "Video candidate audit for %s: combined=%d video-only=%d (response formats=%d adaptive=%d status=%s)",
                     describeClient(client),
                     combined.size,

@@ -434,6 +434,18 @@ class MusicService :
                     "Failed to resolve video stream for %s; falling back to audio-only",
                     baseId,
                 )
+                // YouTube gates most video (and some audio) behind sign-in for GUEST accounts in
+                // 2025+. On a login-gated video, open the existing login-recovery flow instead of
+                // silently showing "No video track in this stream".
+                when (failure) {
+                    is YTPlayerUtils.LoginRequiredForPlaybackException ->
+                        promptLoginRecovery(baseId, failure.targetUrl)
+
+                    is YTPlayerUtils.InvalidPlaybackLoginContextException ->
+                        promptLoginRecovery(baseId, failure.targetUrl)
+
+                    else -> Unit
+                }
             } else if (resolved == null || resolved.url.isEmpty()) {
                 Timber.tag(TAG).w("No playable video stream for %s; falling back to audio-only", baseId)
             }
@@ -504,13 +516,40 @@ class MusicService :
                 if (!isYouTubeMediaHost) return@addInterceptor chain.proceed(request)
 
                 val requestProfile = StreamClientUtils.resolveRequestProfile(request.url)
-                chain.proceed(
-                    StreamClientUtils
-                        .applyRequestProfile(
-                            request.newBuilder(),
-                            requestProfile,
-                        ).build(),
-                )
+                val url = request.url
+                val response =
+                    chain.proceed(
+                        StreamClientUtils
+                            .applyRequestProfile(
+                                request.newBuilder(),
+                                requestProfile,
+                            ).build(),
+                    )
+
+                if (response.code !in 200..299 && host.endsWith("googlevideo.com")) {
+                    // Log WHY a resolved stream URL is rejected (403/404/410) so the video-fetch
+                    // failure can be diagnosed: status, client params (pot/c/cver/expire) and the
+                    // response-body reason (usually "Sign in to confirm you're not a bot" or
+                    // "Video unavailable"). peekBody does not consume the response for the player.
+                    val bodySnippet =
+                        runCatching { response.peekBody(180).string() }
+                            .getOrNull()
+                            .orEmpty()
+                            .replace('\n', ' ')
+                    Timber.tag("MusicService").w(
+                        "Stream URL rejected: status=%d host=%s path=%s c=%s cver=%s hasPot=%s hasExpire=%s rn=%s body=%.180s",
+                        response.code,
+                        url.host,
+                        url.pathSegments.lastOrNull().orEmpty(),
+                        url.queryParameter("c") ?: "-",
+                        url.queryParameter("cver") ?: "-",
+                        url.queryParameter("pot") != null,
+                        url.queryParameter("expire") != null,
+                        url.queryParameter("rn") != null,
+                        bodySnippet,
+                    )
+                }
+                response
             }.build()
     }
     private val extractorMediaOkHttpClient: OkHttpClient by lazy {
