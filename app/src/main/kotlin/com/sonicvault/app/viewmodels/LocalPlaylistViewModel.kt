@@ -51,11 +51,11 @@ import com.sonicvault.app.db.entities.PlaylistSong
 import com.sonicvault.app.extensions.filterBlockedArtists
 import com.sonicvault.app.extensions.reversed
 import com.sonicvault.app.extensions.toEnum
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.YTItem
-import moe.rukamori.archivetune.innertube.models.filterExplicit
-import moe.rukamori.archivetune.innertube.models.filterVideo
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.filterExplicit
+import com.sonicvault.app.innertube.models.filterVideo
 import com.sonicvault.app.models.PlaylistSuggestion
 import com.sonicvault.app.models.PlaylistSuggestionPage
 import com.sonicvault.app.models.PlaylistSuggestionQuery
@@ -463,7 +463,7 @@ class LocalPlaylistViewModel
         }
 
         suspend fun addSongToPlaylist(
-            song: moe.rukamori.archivetune.innertube.models.SongItem,
+            song: com.sonicvault.app.innertube.models.SongItem,
             browseId: String?,
         ): Boolean {
             return try {

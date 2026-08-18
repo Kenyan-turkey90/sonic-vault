@@ -7,7 +7,7 @@
 
 package com.sonicvault.app.utils
 
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import java.net.InetSocketAddress
 import java.net.Proxy
 

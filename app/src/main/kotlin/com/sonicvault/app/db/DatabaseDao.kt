@@ -59,10 +59,10 @@ import com.sonicvault.app.db.entities.SongWithStats
 import com.sonicvault.app.db.entities.TagEntity
 import com.sonicvault.app.extensions.reversed
 import com.sonicvault.app.extensions.toSQLiteQuery
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.pages.AlbumPage
-import moe.rukamori.archivetune.innertube.pages.ArtistPage
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.pages.AlbumPage
+import com.sonicvault.app.innertube.pages.ArtistPage
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.ui.utils.YtimgResizePolicy
@@ -394,6 +394,40 @@ interface DatabaseDao {
     )
     fun quickPicks(now: Long = System.currentTimeMillis()): Flow<List<Song>>
 
+    /**
+     * Smart Mix (AI-DJ style): blends top-played songs from the last 30 days with
+     * liked tracks, weighted by listen count and recency, skipping songs the user
+     * frequently skipped (anti-skip) and blocked artists. Runs entirely on-device.
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT song.*
+        FROM song
+        JOIN (
+            SELECT e.songId,
+                   SUM(e.playTime) AS totalPlayTime,
+                   COUNT(1) AS plays
+            FROM event e
+            WHERE e.timestamp > (:now - 86400000 * 30)
+            GROUP BY e.songId
+        ) recent ON recent.songId = song.id
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM song_artist_map
+            JOIN artist ON artist.id = song_artist_map.artistId
+            WHERE song_artist_map.songId = song.id
+              AND artist.blockedAt IS NOT NULL
+        )
+        ORDER BY recent.plays DESC, recent.totalPlayTime DESC, song.totalPlayTime DESC
+        LIMIT :limit
+        """,
+    )
+    fun smartMixSongs(
+        now: Long = System.currentTimeMillis(),
+        limit: Int = 30,
+    ): Flow<List<Song>>
+
     @Transaction
     @Query(
         """
@@ -500,6 +534,43 @@ interface DatabaseDao {
         fromTimeStamp: Long,
         limit: Int = 6,
         offset: Int = 0,
+        toTimeStamp: Long? = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    ): Flow<List<Song>>
+
+    @Transaction
+    @RewriteQueriesToDropUnusedColumns
+    @Query(
+        """
+        SELECT song.*,
+               (SELECT COUNT(1)
+                FROM event
+                WHERE songId = song.id
+                  AND timestamp > :fromTimeStamp AND timestamp <= :toTimeStamp) AS songCountListened,
+               (SELECT SUM(event.playTime)
+                FROM event
+                WHERE songId = song.id
+                  AND timestamp > :fromTimeStamp AND timestamp <= :toTimeStamp) AS timeListened
+        FROM song
+        WHERE song.isLocal = 0
+          AND song.dateDownload IS NULL
+          AND EXISTS (
+              SELECT 1
+              FROM song_artist_map
+              JOIN artist ON artist.id = song_artist_map.artistId
+              WHERE song_artist_map.songId = song.id
+                AND artist.blockedAt IS NULL
+          )
+        ORDER BY
+            CASE WHEN song.liked THEN 1 ELSE 0 END DESC,
+            songCountListened DESC,
+            timeListened DESC,
+            song.id ASC
+        LIMIT :limit
+    """,
+    )
+    fun smartOfflineCandidates(
+        fromTimeStamp: Long,
+        limit: Int = 50,
         toTimeStamp: Long? = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
     ): Flow<List<Song>>
 

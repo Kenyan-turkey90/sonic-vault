@@ -77,8 +77,8 @@ import com.sonicvault.app.constants.ListThumbnailSize
 import com.sonicvault.app.constants.SpeedDialSongIdsKey
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AlbumItem
 import com.sonicvault.app.playback.ExoDownloadService
 import com.sonicvault.app.playback.queues.YouTubeAlbumRadio
 import com.sonicvault.app.ui.component.ListDialog

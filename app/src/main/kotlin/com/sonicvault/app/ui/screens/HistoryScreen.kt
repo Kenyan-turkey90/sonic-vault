@@ -111,9 +111,9 @@ import com.sonicvault.app.db.entities.EventWithSong
 import com.sonicvault.app.extensions.metadata
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.pages.HistoryPage
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.pages.HistoryPage
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.playback.queues.YouTubeQueue
@@ -797,8 +797,8 @@ private fun RemoteHistoryFeed(
     activeMediaId: String?,
     navController: NavController,
     onRetry: () -> Unit,
-    onSongMenu: (moe.rukamori.archivetune.innertube.models.SongItem) -> Unit,
-    onSongClick: (moe.rukamori.archivetune.innertube.models.SongItem) -> Unit,
+    onSongMenu: (com.sonicvault.app.innertube.models.SongItem) -> Unit,
+    onSongClick: (com.sonicvault.app.innertube.models.SongItem) -> Unit,
 ) {
     LazyColumn(
         state = listState,

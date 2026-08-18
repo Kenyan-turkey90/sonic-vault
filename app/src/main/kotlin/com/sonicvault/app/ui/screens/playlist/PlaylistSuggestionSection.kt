@@ -49,7 +49,7 @@ import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.ui.component.DefaultDialog
 import com.sonicvault.app.ui.component.IconButton

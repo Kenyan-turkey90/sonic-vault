@@ -75,6 +75,8 @@ import com.sonicvault.app.R
 import com.sonicvault.app.constants.MaxCanvasCacheSizeKey
 import com.sonicvault.app.constants.MaxImageCacheSizeKey
 import com.sonicvault.app.constants.MaxSongCacheSizeKey
+import com.sonicvault.app.constants.SmartOfflineKey
+import com.sonicvault.app.constants.SmartOfflineTargetSongsKey
 import com.sonicvault.app.constants.SmartTrimmerKey
 import com.sonicvault.app.extensions.directorySizeBytes
 import com.sonicvault.app.extensions.tryOrNull
@@ -154,6 +156,16 @@ fun StorageSettings(
         rememberPreference(
             key = SmartTrimmerKey,
             defaultValue = false,
+        )
+    val (smartOffline, onSmartOfflineChange) =
+        rememberPreference(
+            key = SmartOfflineKey,
+            defaultValue = false,
+        )
+    val (smartOfflineTargetSongs, onSmartOfflineTargetSongsChange) =
+        rememberPreference(
+            key = SmartOfflineTargetSongsKey,
+            defaultValue = 20,
         )
     val (maxImageCacheSize, onMaxImageCacheSizeChange) =
         rememberPreference(
@@ -333,6 +345,10 @@ fun StorageSettings(
                 smartTrimmer = smartTrimmer,
                 isSmartTrimmerAvailable = isSmartTrimmerAvailable,
                 onSmartTrimmerChange = onSmartTrimmerChange,
+                smartOffline = smartOffline,
+                onSmartOfflineChange = onSmartOfflineChange,
+                smartOfflineTargetSongs = smartOfflineTargetSongs,
+                onSmartOfflineTargetSongsChange = onSmartOfflineTargetSongsChange,
                 onSelectFolder = viewModel::openStorageLocationPicker,
             )
 
@@ -584,6 +600,10 @@ private fun StorageFolderSection(
     smartTrimmer: Boolean,
     isSmartTrimmerAvailable: Boolean,
     onSmartTrimmerChange: (Boolean) -> Unit,
+    smartOffline: Boolean,
+    onSmartOfflineChange: (Boolean) -> Unit,
+    smartOfflineTargetSongs: Int,
+    onSmartOfflineTargetSongsChange: (Int) -> Unit,
     onSelectFolder: () -> Unit,
 ) {
     PreferenceGroup(title = stringResource(R.string.storage_folder)) {
@@ -641,6 +661,25 @@ private fun StorageFolderSection(
                 checked = smartTrimmer && isSmartTrimmerAvailable,
                 onCheckedChange = onSmartTrimmerChange,
                 isEnabled = isSmartTrimmerAvailable,
+            )
+        }
+
+        item {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.smart_offline)) },
+                description = stringResource(R.string.smart_offline_description),
+                icon = { Icon(painterResource(R.drawable.download), null) },
+                checked = smartOffline,
+                onCheckedChange = onSmartOfflineChange,
+                isEnabled = isSmartTrimmerAvailable,
+            )
+        }
+
+        item {
+            SmartOfflineTargetPreference(
+                targetSongs = smartOfflineTargetSongs,
+                onTargetSongsChange = onSmartOfflineTargetSongsChange,
+                isEnabled = smartOffline,
             )
         }
     }
@@ -935,3 +974,24 @@ private const val StorageRefreshIntervalMillis = 500L
 private const val CacheSizeBytesPerMegabyte = 1024L * 1024L
 
 private fun cacheSizeMegabytesToBytes(sizeMegabytes: Int): Long = sizeMegabytes.toLong().coerceAtLeast(0L) * CacheSizeBytesPerMegabyte
+
+@Composable
+private fun SmartOfflineTargetPreference(
+    targetSongs: Int,
+    onTargetSongsChange: (Int) -> Unit,
+    isEnabled: Boolean,
+) {
+    val options = remember { listOf(5, 10, 20, 30, 50, 100) }
+    PreferenceEntry(
+        title = { Text(stringResource(R.string.smart_offline_target)) },
+        description = stringResource(R.string.smart_offline_target_count, targetSongs),
+        icon = { Icon(painterResource(R.drawable.music_note), null) },
+        isEnabled = isEnabled,
+        onClick = {
+            if (isEnabled) {
+                val next = options[(options.indexOf(targetSongs) + 1) % options.size]
+                onTargetSongsChange(next)
+            }
+        },
+    )
+}

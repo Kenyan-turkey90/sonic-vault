@@ -25,7 +25,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import com.sonicvault.app.canvas.models.CanvasArtwork
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.storage.StorageFolderKind
 import com.sonicvault.app.storage.StorageLocationRepository
 import com.sonicvault.app.utils.StreamClientUtils

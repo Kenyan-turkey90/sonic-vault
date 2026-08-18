@@ -7,9 +7,9 @@
 
 package com.sonicvault.app.ui.utils
 
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.YTItem
 
 private const val SQUARE_RATIO = 1f
 private const val LANDSCAPE_RATIO = 16f / 9f

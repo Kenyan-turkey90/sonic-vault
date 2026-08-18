@@ -100,8 +100,8 @@ import com.sonicvault.app.db.entities.PlaylistSongMap
 import com.sonicvault.app.extensions.metadata
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.queues.YouTubeQueue
 import com.sonicvault.app.ui.component.DraggableScrollbar

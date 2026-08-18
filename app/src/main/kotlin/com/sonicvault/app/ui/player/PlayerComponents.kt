@@ -110,6 +110,8 @@ import com.sonicvault.app.constants.PlayerHorizontalPadding
 import com.sonicvault.app.constants.SliderStyle
 import com.sonicvault.app.db.entities.FormatEntity
 import com.sonicvault.app.db.entities.codecLabel
+import com.sonicvault.app.db.entities.formattedBitrate
+import com.sonicvault.app.db.entities.formattedSampleRate
 import com.sonicvault.app.extensions.togglePlayPause
 import com.sonicvault.app.extensions.toggleRepeatMode
 import com.sonicvault.app.models.MediaMetadata
@@ -1866,40 +1868,19 @@ fun PlayerControlsContent(
         textBackgroundColor = textBackgroundColor,
         showRemainingTime = playerDesignStyle == PlayerDesignStyle.V7,
         centerContent =
-            if (playerDesignStyle == PlayerDesignStyle.V7 && currentFormat != null) {
+            if (currentFormat != null) {
                 {
-                    val codec = currentFormat.mimeType.substringAfter("/").uppercase()
-                    val label =
-                        when {
-                            codec.contains("FLAC") || codec.contains("ALAC") -> "Lossless"
-                            codec.contains("OPUS") -> codec
-                            codec.contains("AAC") -> codec
-                            codec.contains("MP4A") -> "AAC"
-                            codec.contains("VORBIS") -> "Vorbis"
-                            else -> codec
-                        }
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = textBackgroundColor.copy(alpha = 0.12f),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.graphic_eq),
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = textBackgroundColor.copy(alpha = 0.8f),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = textBackgroundColor.copy(alpha = 0.8f),
-                            )
-                        }
-                    }
+                    StreamFormatBadge(
+                        currentFormat = currentFormat,
+                        foreground = textBackgroundColor,
+                        onClick = {
+                            mediaMetadata.id.let { id ->
+                                bottomSheetPageState.show {
+                                    ShowMediaInfo(id)
+                                }
+                            }
+                        },
+                    )
                 }
             } else {
                 null
@@ -2764,21 +2745,34 @@ private fun V8QualityChip(
     foreground: Color,
     modifier: Modifier = Modifier,
 ) {
+    StreamFormatBadge(
+        currentFormat = currentFormat,
+        foreground = foreground,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Live stream-format badge (Tidal-style): shows the codec, bitrate and sample rate of the
+ * stream that is actually playing. Tap to open the full media-info sheet.
+ */
+@Composable
+internal fun StreamFormatBadge(
+    currentFormat: FormatEntity,
+    foreground: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     val label =
-        remember(currentFormat.mimeType, currentFormat.codecs) {
-            currentFormat.codecLabel()
+        remember(currentFormat.mimeType, currentFormat.codecs, currentFormat.bitrate, currentFormat.sampleRate) {
+            buildList {
+                add(currentFormat.codecLabel())
+                currentFormat.formattedBitrate()?.let(::add)
+                currentFormat.formattedSampleRate()?.let(::add)
+            }.joinToString(" · ")
         }
 
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = foreground.copy(alpha = 0.1f),
-        border =
-            androidx.compose.foundation.BorderStroke(
-                width = 1.dp,
-                color = foreground.copy(alpha = 0.13f),
-            ),
-        modifier = modifier,
-    ) {
+    val badgeContent: @Composable () -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -2796,6 +2790,35 @@ private fun V8QualityChip(
                 color = foreground.copy(alpha = 0.72f),
                 maxLines = 1,
             )
+        }
+    }
+
+    val shape = RoundedCornerShape(6.dp)
+    val containerColor = foreground.copy(alpha = 0.1f)
+    val border =
+        androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = foreground.copy(alpha = 0.13f),
+        )
+
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            shape = shape,
+            color = containerColor,
+            border = border,
+            modifier = modifier,
+        ) {
+            badgeContent()
+        }
+    } else {
+        Surface(
+            shape = shape,
+            color = containerColor,
+            border = border,
+            modifier = modifier,
+        ) {
+            badgeContent()
         }
     }
 }

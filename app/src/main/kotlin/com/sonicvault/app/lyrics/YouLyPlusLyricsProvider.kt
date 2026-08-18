@@ -13,7 +13,7 @@ import com.sonicvault.app.constants.EnableYouLyPlusLyricsKey
 import com.sonicvault.app.utils.GlobalLog
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
-import moe.rukamori.archivetune.youlyplus.YouLyPlus
+import com.sonicvault.app.youlyplus.YouLyPlus
 
 object YouLyPlusLyricsProvider : LyricsProvider {
     init {

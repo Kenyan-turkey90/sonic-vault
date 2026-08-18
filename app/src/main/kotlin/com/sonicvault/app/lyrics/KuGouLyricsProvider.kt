@@ -9,7 +9,7 @@ package com.sonicvault.app.lyrics
 
 import android.content.Context
 import com.sonicvault.app.constants.EnableKugouKey
-import moe.rukamori.archivetune.kugou.KuGou
+import com.sonicvault.app.kugou.KuGou
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 

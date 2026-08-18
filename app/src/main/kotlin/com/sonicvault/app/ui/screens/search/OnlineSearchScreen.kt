@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.drop
 import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.models.*
+import com.sonicvault.app.innertube.models.*
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.queues.YouTubeQueue
 import com.sonicvault.app.ui.component.LocalMenuState

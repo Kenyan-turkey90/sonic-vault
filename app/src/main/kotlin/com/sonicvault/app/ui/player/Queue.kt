@@ -24,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,8 +49,11 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -83,8 +87,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -110,9 +117,12 @@ import com.sonicvault.app.db.entities.PlaylistEntity
 import com.sonicvault.app.db.entities.PlaylistSongMap
 import com.sonicvault.app.extensions.metadata
 import com.sonicvault.app.extensions.move
+import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
 import com.sonicvault.app.extensions.toggleRepeatMode
 import com.sonicvault.app.models.MediaMetadata
+import com.sonicvault.app.playback.queues.ListQueue
+import com.sonicvault.app.playback.queues.SavedQueueStore
 import com.sonicvault.app.ui.component.BottomSheet
 import com.sonicvault.app.ui.component.BottomSheetState
 import com.sonicvault.app.ui.component.LocalBottomSheetPageState
@@ -200,6 +210,8 @@ fun Queue(
     val database = LocalDatabase.current
     var showChoosePlaylistDialog by rememberSaveable { mutableStateOf(false) }
     var showCreateQueuePlaylistDialog by rememberSaveable { mutableStateOf(false) }
+    var showSaveQueueDialog by rememberSaveable { mutableStateOf(false) }
+    var showSavedQueuesDialog by rememberSaveable { mutableStateOf(false) }
 
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
@@ -297,6 +309,124 @@ fun Queue(
     }
 
     val queueWindows by playerConnection.queueWindows.collectAsState()
+
+    if (showSaveQueueDialog) {
+        TextFieldDialog(
+            icon = {
+                Icon(
+                    painter = painterResource(R.drawable.bookmark),
+                    contentDescription = null,
+                )
+            },
+            title = { Text(text = stringResource(R.string.save_queue)) },
+            placeholder = { Text(text = stringResource(R.string.queue_name)) },
+            initialTextFieldValue = TextFieldValue(queueTitle ?: context.getString(R.string.queue)),
+            isInputValid = { it.trim().isNotEmpty() },
+            onDismiss = { showSaveQueueDialog = false },
+            onDone = saveQueueDone@{ rawName ->
+                val name = rawName.trim()
+                if (name.isEmpty()) return@saveQueueDone
+                val saved =
+                    SavedQueueStore.saveQueue(
+                        context = context,
+                        name = name,
+                        items = queueWindows.mapNotNull { it.mediaItem.metadata },
+                        queueTitle = queueTitle,
+                    )
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        if (saved) R.string.queue_saved else R.string.queue_save_failed,
+                        name,
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                showSaveQueueDialog = false
+            },
+        )
+    }
+
+    if (showSavedQueuesDialog) {
+        val savedQueues = remember { SavedQueueStore.listQueues(context) }
+        AlertDialog(
+            onDismissRequest = { showSavedQueuesDialog = false },
+            title = { Text(text = stringResource(R.string.saved_queues)) },
+            text = {
+                if (savedQueues.isEmpty()) {
+                    Text(text = stringResource(R.string.no_saved_queues))
+                } else {
+                    Column {
+                        savedQueues.forEach { summary ->
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            val items =
+                                                SavedQueueStore.loadQueue(context, summary.name)
+                                                    .map { it.toMediaItem() }
+                                            if (items.isNotEmpty()) {
+                                                playerConnection.playQueue(
+                                                    ListQueue(
+                                                        title = summary.title.ifBlank { summary.name },
+                                                        items = items,
+                                                    ),
+                                                )
+                                            }
+                                            showSavedQueuesDialog = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = summary.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text =
+                                            pluralStringResource(
+                                                R.plurals.n_song,
+                                                summary.itemCount,
+                                                summary.itemCount,
+                                            ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        SavedQueueStore.deleteQueue(context, summary.name)
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.queue_deleted, summary.name),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                        showSavedQueuesDialog = false
+                                    },
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.delete),
+                                        contentDescription = stringResource(R.string.delete),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSavedQueuesDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
     val currentWindow =
         remember(currentWindowIndex, queueWindows) {
             queueWindows.getOrNull(currentWindowIndex)
@@ -914,6 +1044,8 @@ fun Queue(
                             playerConnection.service.onInfiniteQueueDisabled()
                         }
                     },
+                    onSaveQueueClick = { showSaveQueueDialog = true },
+                    onSavedQueuesClick = { showSavedQueuesDialog = true },
                 )
 
                 LazyColumn(

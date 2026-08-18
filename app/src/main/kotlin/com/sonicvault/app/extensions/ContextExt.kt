@@ -12,7 +12,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.sonicvault.app.constants.InnerTubeCookieKey
 import com.sonicvault.app.constants.YtmSyncKey
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 

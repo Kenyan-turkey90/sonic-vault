@@ -71,7 +71,7 @@ import androidx.navigation.NavController
 import com.sonicvault.app.LocalAnimationsDisabled
 import com.sonicvault.app.LocalPlayerAwareWindowInsets
 import com.sonicvault.app.R
-import moe.rukamori.archivetune.morideobfuscator.CipherRuntimeStatus
+import com.sonicvault.app.morideobfuscator.CipherRuntimeStatus
 import com.sonicvault.app.ui.component.IconButton
 import com.sonicvault.app.ui.component.PreferenceEntry
 import com.sonicvault.app.ui.component.PreferenceGroup

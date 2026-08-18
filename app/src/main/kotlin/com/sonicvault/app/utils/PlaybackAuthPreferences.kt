@@ -23,8 +23,8 @@ import com.sonicvault.app.constants.PoTokenPlayerKey
 import com.sonicvault.app.constants.PoTokenSourceUrlKey
 import com.sonicvault.app.constants.VisitorDataKey
 import com.sonicvault.app.constants.WebClientPoTokenEnabledKey
-import moe.rukamori.archivetune.innertube.PlaybackAuthState
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.PlaybackAuthState
+import com.sonicvault.app.innertube.YouTube
 
 fun Preferences.toPlaybackAuthState(): PlaybackAuthState =
     PlaybackAuthState(

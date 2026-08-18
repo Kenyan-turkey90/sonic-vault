@@ -9,7 +9,7 @@ package com.sonicvault.app.lyrics
 
 import android.content.Context
 import com.sonicvault.app.constants.EnableSimpMusicLyricsKey
-import moe.rukamori.archivetune.simpmusic.SimpMusicLyrics
+import com.sonicvault.app.simpmusic.SimpMusicLyrics
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 

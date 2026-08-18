@@ -10,7 +10,7 @@ package com.sonicvault.app.lyrics
 import android.content.Context
 import android.util.Log
 import com.sonicvault.app.constants.EnableUnisonLyricsKey
-import moe.rukamori.archivetune.unison.Unison
+import com.sonicvault.app.unison.Unison
 import com.sonicvault.app.utils.GlobalLog
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get

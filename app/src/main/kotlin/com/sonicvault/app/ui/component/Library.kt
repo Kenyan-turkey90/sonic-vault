@@ -26,8 +26,8 @@ import com.sonicvault.app.R
 import com.sonicvault.app.db.entities.Album
 import com.sonicvault.app.db.entities.Artist
 import com.sonicvault.app.db.entities.Playlist
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.ui.menu.AlbumMenu
 import com.sonicvault.app.ui.menu.ArtistMenu
 import com.sonicvault.app.ui.menu.PlaylistMenu

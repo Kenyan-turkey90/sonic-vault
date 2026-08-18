@@ -12,8 +12,8 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
 import com.sonicvault.app.db.entities.AlbumWithSongs
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.models.MediaMetadata
 
 class LocalAlbumRadio(

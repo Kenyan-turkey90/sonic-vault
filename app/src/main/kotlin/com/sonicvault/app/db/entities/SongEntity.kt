@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import java.time.LocalDateTime
 
 @Immutable

@@ -76,7 +76,7 @@ import com.sonicvault.app.extensions.filterExplicitAlbums
 import com.sonicvault.app.extensions.filterVideo
 import com.sonicvault.app.extensions.reversed
 import com.sonicvault.app.extensions.toEnum
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.library.LibraryTopMix
 import com.sonicvault.app.library.ObserveLibraryTopMixesUseCase
 import com.sonicvault.app.library.RefreshLibraryTopMixesResult

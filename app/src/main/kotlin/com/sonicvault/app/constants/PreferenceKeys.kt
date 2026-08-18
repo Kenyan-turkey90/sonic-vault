@@ -35,7 +35,10 @@ val SwipeToSongKey = booleanPreferencesKey("SwipeToSong")
 val PlayerDesignStyleKey = stringPreferencesKey("playerDesignStyle")
 val ShowPlayerVolumeBarKey = booleanPreferencesKey("showPlayerVolumeBar")
 val HidePlayerThumbnailKey = booleanPreferencesKey("hidePlayerThumbnail")
-val SonicVaultCanvasKey = booleanPreferencesKey("archiveTuneCanvas")
+val SonicVaultCanvasKey = booleanPreferencesKey("sonicVaultCanvas")
+
+// Legacy key written by pre-rebrand builds; App.kt migrates it to SonicVaultCanvasKey once.
+val LegacySonicVaultCanvasKey = booleanPreferencesKey("archiveTuneCanvas")
 val ThumbnailCornerRadiusKey = floatPreferencesKey("thumbnailCornerRadius")
 val CropThumbnailToSquareKey = booleanPreferencesKey("cropThumbnailToSquare")
 
@@ -276,6 +279,11 @@ val AudioQualityKey = stringPreferencesKey("audioQuality")
 val NetworkMeteredKey = booleanPreferencesKey("networkMetered")
 val LowDataModeKey = NetworkMeteredKey
 
+/** Tidal-style per-network quality: when enabled, cellular uses [CellularAudioQualityKey]
+ * instead of [AudioQualityKey]. */
+val PerNetworkQualityKey = booleanPreferencesKey("perNetworkQuality")
+val CellularAudioQualityKey = stringPreferencesKey("cellularAudioQuality")
+
 enum class AudioQuality {
     AUTO,
     HIGH,
@@ -285,13 +293,10 @@ enum class AudioQuality {
 
 val PlayerStreamClientKey = stringPreferencesKey("playerStreamClient")
 
-/** Global default: play tracks as videos vs songs. A per-track override in the player wins over this. */
-val VideoModeEnabledKey = booleanPreferencesKey("videoModeEnabled")
-
 enum class PlayerStreamClient {
     ANDROID_VR,
     WEB_REMIX,
-    ARCHIVETUNE_EXTRACTOR,
+    SONICVAULT_EXTRACTOR,
     HI_RES_LOSSLESS,
     IOS,
     TVHTML5,
@@ -336,6 +341,10 @@ val EqualizerCustomProfilesJsonKey = stringPreferencesKey("equalizerCustomProfil
 
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val SmartTrimmerKey = booleanPreferencesKey("smartTrimmer")
+val SmartOfflineKey = booleanPreferencesKey("smartOffline")
+val SmartOfflineTargetSongsKey = intPreferencesKey("smartOfflineTargetSongs")
+val PlaybackVideoModeKey = booleanPreferencesKey("playbackVideoMode")
+val SponsorBlockEnabledKey = booleanPreferencesKey("sponsorBlockEnabled")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
 val MaxCanvasCacheSizeKey = intPreferencesKey("maxCanvasCacheSize")
 val StorageFolderIdKey = stringPreferencesKey("storageFolderId")

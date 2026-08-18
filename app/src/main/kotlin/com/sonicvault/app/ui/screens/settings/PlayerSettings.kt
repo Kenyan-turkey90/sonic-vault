@@ -37,6 +37,8 @@ import com.sonicvault.app.constants.AudioNormalizationKey
 import com.sonicvault.app.constants.AudioOffload
 import com.sonicvault.app.constants.AudioQuality
 import com.sonicvault.app.constants.AudioQualityKey
+import com.sonicvault.app.constants.CellularAudioQualityKey
+import com.sonicvault.app.constants.PerNetworkQualityKey
 import com.sonicvault.app.constants.AutoDownloadOnLikeKey
 import com.sonicvault.app.constants.AutoSkipNextOnErrorKey
 import com.sonicvault.app.constants.AutoStartOnBluetoothKey
@@ -59,9 +61,10 @@ import com.sonicvault.app.constants.PoTokenGvsKey
 import com.sonicvault.app.constants.PoTokenPlayerKey
 import com.sonicvault.app.constants.SeekExtraSeconds
 import com.sonicvault.app.constants.SkipSilenceKey
+import com.sonicvault.app.constants.SponsorBlockEnabledKey
 import com.sonicvault.app.constants.StopMusicOnTaskClearKey
 import com.sonicvault.app.constants.WakelockKey
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.ui.component.ArtistSeparatorsDialog
 import com.sonicvault.app.ui.component.CrossfadeSliderPreference
 import com.sonicvault.app.ui.component.EnumListPreference
@@ -85,6 +88,21 @@ fun PlayerSettings(navController: NavController) {
         rememberEnumPreference(
             AudioQualityKey,
             defaultValue = AudioQuality.AUTO,
+        )
+    val (perNetworkQuality, onPerNetworkQualityChange) =
+        rememberPreference(
+            PerNetworkQualityKey,
+            defaultValue = false,
+        )
+    val (cellularAudioQuality, onCellularAudioQualityChange) =
+        rememberEnumPreference(
+            CellularAudioQualityKey,
+            defaultValue = AudioQuality.HIGH,
+        )
+    val (sponsorBlockEnabled, onSponsorBlockEnabledChange) =
+        rememberPreference(
+            SponsorBlockEnabledKey,
+            defaultValue = false,
         )
     val (playerStreamClient, onPlayerStreamClientChange) =
         rememberEnumPreference(
@@ -217,7 +235,7 @@ fun PlayerSettings(navController: NavController) {
         remember {
             listOf(
                 PlayerStreamClient.WEB_REMIX,
-                PlayerStreamClient.ARCHIVETUNE_EXTRACTOR,
+                PlayerStreamClient.SONICVAULT_EXTRACTOR,
             )
         }
     val selectedPlayerStreamClient =
@@ -226,11 +244,11 @@ fun PlayerSettings(navController: NavController) {
         } else {
             PlayerStreamClient.WEB_REMIX
         }
-    val audioQualityEnabled = selectedPlayerStreamClient != PlayerStreamClient.ARCHIVETUNE_EXTRACTOR
+    val audioQualityEnabled = selectedPlayerStreamClient != PlayerStreamClient.SONICVAULT_EXTRACTOR
     val isPlayerStreamClientEnabled =
         remember(isSonicVaultExtractorEnabled) {
             { client: PlayerStreamClient ->
-                client != PlayerStreamClient.ARCHIVETUNE_EXTRACTOR ||
+                client != PlayerStreamClient.SONICVAULT_EXTRACTOR ||
                     isSonicVaultExtractorEnabled
             }
         }
@@ -243,7 +261,7 @@ fun PlayerSettings(navController: NavController) {
         if (
             playerStreamClient !in playerStreamClients ||
             (
-                playerStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR &&
+                playerStreamClient == PlayerStreamClient.SONICVAULT_EXTRACTOR &&
                     !isSonicVaultExtractorEnabled
             )
         ) {
@@ -330,6 +348,36 @@ fun PlayerSettings(navController: NavController) {
                 }
 
                 item {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.per_network_quality)) },
+                        description = stringResource(R.string.per_network_quality_desc),
+                        icon = { Icon(painterResource(R.drawable.waves), null) },
+                        checked = perNetworkQuality,
+                        onCheckedChange = onPerNetworkQualityChange,
+                        isEnabled = audioQualityEnabled,
+                    )
+                }
+
+                item {
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.cellular_audio_quality)) },
+                        description = stringResource(R.string.cellular_audio_quality_desc),
+                        icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
+                        selectedValue = cellularAudioQuality,
+                        onValueSelected = onCellularAudioQualityChange,
+                        isEnabled = audioQualityEnabled && perNetworkQuality,
+                        valueText = {
+                            when (it) {
+                                AudioQuality.HIGHEST -> stringResource(R.string.audio_quality_max)
+                                AudioQuality.HIGH -> stringResource(R.string.audio_quality_high)
+                                AudioQuality.AUTO -> stringResource(R.string.audio_quality_auto)
+                                AudioQuality.LOW -> stringResource(R.string.audio_quality_low)
+                            }
+                        },
+                    )
+                }
+
+                item {
                     ListPreference(
                         title = { Text(stringResource(R.string.player_stream_client)) },
                         description = stringResource(R.string.player_stream_client_desc),
@@ -344,9 +392,9 @@ fun PlayerSettings(navController: NavController) {
                                     stringResource(R.string.player_stream_client_web_remix)
                                 }
 
-                                PlayerStreamClient.ARCHIVETUNE_EXTRACTOR -> {
+                                PlayerStreamClient.SONICVAULT_EXTRACTOR -> {
                                     stringResource(
-                                        R.string.player_stream_client_archivetune_extractor,
+                                        R.string.player_stream_client_sonicvault_extractor,
                                     )
                                 }
 
@@ -361,14 +409,14 @@ fun PlayerSettings(navController: NavController) {
                                     stringResource(R.string.player_stream_client_web_remix_desc)
                                 }
 
-                                PlayerStreamClient.ARCHIVETUNE_EXTRACTOR -> {
+                                PlayerStreamClient.SONICVAULT_EXTRACTOR -> {
                                     if (isSonicVaultExtractorEnabled) {
                                         stringResource(
-                                            R.string.player_stream_client_archivetune_extractor_desc,
+                                            R.string.player_stream_client_sonicvault_extractor_desc,
                                         )
                                     } else {
                                         stringResource(
-                                            R.string.player_stream_client_archivetune_extractor_login_required,
+                                            R.string.player_stream_client_sonicvault_extractor_login_required,
                                         )
                                     }
                                 }
@@ -387,6 +435,16 @@ fun PlayerSettings(navController: NavController) {
                         description = stringResource(R.string.mori_cipher_settings_description),
                         icon = { Icon(painterResource(R.drawable.security), null) },
                         onClick = { navController.navigate("settings/player/chiper") },
+                    )
+                }
+
+                item {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.sponsor_block)) },
+                        description = stringResource(R.string.sponsor_block_desc),
+                        icon = { Icon(painterResource(R.drawable.skip_next), null) },
+                        checked = sponsorBlockEnabled,
+                        onCheckedChange = onSponsorBlockEnabledChange,
                     )
                 }
 

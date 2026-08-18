@@ -19,8 +19,8 @@ import kotlinx.coroutines.withContext
 import com.sonicvault.app.constants.HistorySource
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.db.entities.EventWithSong
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.pages.HistoryPage
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.pages.HistoryPage
 import com.sonicvault.app.utils.reportException
 import timber.log.Timber
 import java.time.DayOfWeek

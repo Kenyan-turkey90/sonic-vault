@@ -39,13 +39,13 @@ import com.sonicvault.app.constants.*
 import com.sonicvault.app.extensions.*
 import com.sonicvault.app.gatekeeper.GatekeeperResult
 import com.sonicvault.app.gatekeeper.RunGatekeeperCheckUseCase
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.YouTubeLocale
-import moe.rukamori.archivetune.kugou.KuGou
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.YouTubeLocale
+import com.sonicvault.app.kugou.KuGou
 import com.sonicvault.app.lastfm.LastFM
-import moe.rukamori.archivetune.morideobfuscator.MoriCipherConfig
-import moe.rukamori.archivetune.morideobfuscator.MoriCipherRuntime
-import moe.rukamori.archivetune.paxsenix.PaxsenixLyrics
+import com.sonicvault.app.morideobfuscator.MoriCipherConfig
+import com.sonicvault.app.morideobfuscator.MoriCipherRuntime
+import com.sonicvault.app.paxsenix.PaxsenixLyrics
 import com.sonicvault.app.scrobbling.LastFmServiceConfig
 import com.sonicvault.app.storage.StorageFolderKind
 import com.sonicvault.app.storage.StorageLocationRepository
@@ -171,6 +171,33 @@ class App :
     }
 
     private fun initializeDeferredAsync() {
+        // One-time preference migrations from the pre-rebrand key names, so existing users keep
+        // their settings across the ArchiveTune -> SonicVault rename.
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching {
+                val prefs = dataStore.data.first()
+                var migrated = false
+
+                // PlayerStreamClient enum value renamed ARCHIVETUNE_EXTRACTOR -> SONICVAULT_EXTRACTOR.
+                if (prefs[PlayerStreamClientKey] == "ARCHIVETUNE_EXTRACTOR") {
+                    dataStore.edit {
+                        it[PlayerStreamClientKey] = PlayerStreamClient.SONICVAULT_EXTRACTOR.name
+                    }
+                    migrated = true
+                }
+
+                // SonicVaultCanvasKey stored value renamed archiveTuneCanvas -> sonicVaultCanvas.
+                if (prefs[LegacySonicVaultCanvasKey] != null && prefs[SonicVaultCanvasKey] == null) {
+                    dataStore.edit {
+                        it[SonicVaultCanvasKey] = prefs[LegacySonicVaultCanvasKey] ?: false
+                        it.remove(LegacySonicVaultCanvasKey)
+                    }
+                    migrated = true
+                }
+                if (migrated) Timber.i("Migrated legacy pre-rebrand preferences")
+            }.onFailure { Timber.w(it, "Preference migration failed") }
+        }
+
         applicationScope.launch(Dispatchers.IO) {
             MoriCipherRuntime
                 .refresh(force = false)

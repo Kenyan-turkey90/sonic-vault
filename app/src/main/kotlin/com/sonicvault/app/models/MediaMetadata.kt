@@ -10,9 +10,9 @@ package com.sonicvault.app.models
 import androidx.compose.runtime.Immutable
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.db.entities.SongEntity
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_OMV
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_UGC
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_OMV
+import com.sonicvault.app.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_UGC
 import com.sonicvault.app.ui.utils.YtimgResizePolicy
 import com.sonicvault.app.ui.utils.resize
 import java.io.Serializable

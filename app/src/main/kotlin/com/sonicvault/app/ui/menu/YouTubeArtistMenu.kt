@@ -47,7 +47,7 @@ import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.SpeedDialSongIdsKey
 import com.sonicvault.app.db.entities.ArtistEntity
-import moe.rukamori.archivetune.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.ArtistItem
 import com.sonicvault.app.playback.queues.YouTubeQueue
 import com.sonicvault.app.ui.component.MenuSurfaceSection
 import com.sonicvault.app.ui.component.NewAction

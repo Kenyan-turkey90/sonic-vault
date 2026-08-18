@@ -72,6 +72,7 @@ import com.sonicvault.app.ui.screens.settings.MusicTogetherScreen
 import com.sonicvault.app.ui.screens.settings.PO_TOKEN_ROUTE
 import com.sonicvault.app.ui.screens.settings.PalettePickerScreen
 import com.sonicvault.app.ui.screens.settings.PlayerSettings
+import com.sonicvault.app.ui.screens.settings.PlaybackDiagnosticsScreen
 import com.sonicvault.app.ui.screens.settings.PoTokenScreen
 import com.sonicvault.app.ui.screens.settings.PrivacySettings
 import com.sonicvault.app.ui.screens.settings.SettingsScreen
@@ -451,6 +452,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/logcat") {
         LogcatScreen(navController)
+    }
+    composable("settings/playback_diagnostics") {
+        PlaybackDiagnosticsScreen(navController)
     }
     if (BuildConfig.UPDATER_AVAILABLE) {
         composable("settings/update") {

@@ -17,13 +17,13 @@ import kotlinx.coroutines.withContext
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.db.entities.Artist
 import com.sonicvault.app.db.entities.Song
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
-import moe.rukamori.archivetune.innertube.pages.ChartsPage
-import moe.rukamori.archivetune.innertube.pages.MoodAndGenres
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.pages.ChartsPage
+import com.sonicvault.app.innertube.pages.MoodAndGenres
 import javax.inject.Inject
 import javax.inject.Singleton
 

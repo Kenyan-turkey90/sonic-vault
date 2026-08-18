@@ -161,7 +161,7 @@ fun AppearanceSettings(navController: NavController) {
             HidePlayerThumbnailKey,
             defaultValue = false,
         )
-    val (archiveTuneCanvasEnabled, onSonicVaultCanvasEnabledChange) =
+    val (sonicVaultCanvasEnabled, onSonicVaultCanvasEnabledChange) =
         rememberPreference(
             SonicVaultCanvasKey,
             defaultValue = false,
@@ -764,10 +764,10 @@ fun AppearanceSettings(navController: NavController) {
 
                 item {
                     SwitchPreference(
-                        title = { Text(stringResource(R.string.archivetune_canvas)) },
-                        description = stringResource(R.string.archivetune_canvas_desc),
+                        title = { Text(stringResource(R.string.sonicvault_canvas)) },
+                        description = stringResource(R.string.sonicvault_canvas_desc),
                         icon = { Icon(painterResource(R.drawable.motion_photos_on), null) },
-                        checked = archiveTuneCanvasEnabled,
+                        checked = sonicVaultCanvasEnabled,
                         onCheckedChange = onSonicVaultCanvasEnabledChange,
                     )
                 }

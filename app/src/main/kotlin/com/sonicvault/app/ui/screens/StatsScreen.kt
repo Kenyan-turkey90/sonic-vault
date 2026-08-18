@@ -99,7 +99,7 @@ import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.db.entities.SongWithStats
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.queues.ListQueue

@@ -84,7 +84,6 @@ import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
@@ -137,9 +136,10 @@ import com.sonicvault.app.cast.CastPlaybackRepository
 import com.sonicvault.app.cast.CastPlaybackRepositoryLocator
 import com.sonicvault.app.constants.AudioNormalizationKey
 import com.sonicvault.app.constants.AudioOffload
-import com.sonicvault.app.constants.VideoModeEnabledKey
 import com.sonicvault.app.constants.AudioQuality
 import com.sonicvault.app.constants.AudioQualityKey
+import com.sonicvault.app.constants.CellularAudioQualityKey
+import com.sonicvault.app.constants.PerNetworkQualityKey
 import com.sonicvault.app.constants.AutoDownloadOnLikeKey
 import com.sonicvault.app.constants.AutoLoadMoreKey
 import com.sonicvault.app.constants.AutoSkipNextOnErrorKey
@@ -181,6 +181,8 @@ import com.sonicvault.app.constants.PauseListenHistoryKey
 import com.sonicvault.app.constants.PauseOnDeviceMuteKey
 import com.sonicvault.app.constants.PermanentShuffleKey
 import com.sonicvault.app.constants.PersistentQueueKey
+import com.sonicvault.app.constants.PlaybackVideoModeKey
+import com.sonicvault.app.constants.SponsorBlockEnabledKey
 import com.sonicvault.app.constants.PlayerStreamClient
 import com.sonicvault.app.constants.PlayerStreamClientKey
 import com.sonicvault.app.constants.PlayerVolumeKey
@@ -217,11 +219,11 @@ import com.sonicvault.app.extensions.toContinuationQueue
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.toPersistQueue
 import com.sonicvault.app.extensions.toQueue
-import moe.rukamori.archivetune.innertube.PlaybackAuthState
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
-import moe.rukamori.archivetune.innertube.models.response.PlayerResponse
+import com.sonicvault.app.innertube.PlaybackAuthState
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.response.PlayerResponse
 import com.sonicvault.app.lastfm.LastFM
 import com.sonicvault.app.lyrics.LyricsHelper
 import com.sonicvault.app.lyrics.LyricsPreloadManager
@@ -229,9 +231,9 @@ import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.PersistPlayerState
 import com.sonicvault.app.models.PersistQueue
 import com.sonicvault.app.models.toMediaMetadata
-import moe.rukamori.archivetune.moriextractor.ArchiveTuneExtractorException
-import moe.rukamori.archivetune.moriextractor.InMemoryBearerTokenRepository
-import moe.rukamori.archivetune.moriextractor.StreamingExtractionManager
+import com.sonicvault.app.moriextractor.SonicVaultExtractorException
+import com.sonicvault.app.moriextractor.InMemoryBearerTokenRepository
+import com.sonicvault.app.moriextractor.StreamingExtractionManager
 import com.sonicvault.app.playback.queues.EmptyQueue
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.playback.queues.Queue
@@ -249,6 +251,7 @@ import com.sonicvault.app.ui.screens.settings.ListenBrainzManager
 import com.sonicvault.app.utils.AuthScopedCacheValue
 import com.sonicvault.app.utils.CoilBitmapLoader
 import com.sonicvault.app.utils.NetworkConnectivityObserver
+import com.sonicvault.app.utils.PlaybackDiagnosticsRecorder
 import com.sonicvault.app.utils.StreamClientUtils
 import com.sonicvault.app.utils.SyncUtils
 import com.sonicvault.app.utils.YTPlayerUtils
@@ -256,6 +259,9 @@ import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.enumPreference
 import com.sonicvault.app.utils.get
 import com.sonicvault.app.utils.getAsync
+import com.sonicvault.app.utils.preference
+import com.sonicvault.app.utils.ReplayGainParser
+import com.sonicvault.app.utils.SponsorBlock
 import com.sonicvault.app.utils.isLocalMediaId
 import com.sonicvault.app.utils.isLowDataModeActive
 import com.sonicvault.app.utils.reportException
@@ -312,6 +318,9 @@ class MusicService :
     @Inject
     lateinit var equalizerPlaybackController: EqualizerPlaybackController
 
+    @Inject
+    lateinit var smartOfflineScheduler: SmartOfflineScheduler
+
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
     private var lastAudioFocusState = AudioManager.AUDIOFOCUS_NONE
@@ -367,6 +376,16 @@ class MusicService :
         AudioQualityKey,
         com.sonicvault.app.constants.AudioQuality.AUTO,
     )
+    private val perNetworkQuality by preference(
+        this,
+        PerNetworkQualityKey,
+        false,
+    )
+    private val cellularAudioQuality by enumPreference(
+        this,
+        CellularAudioQualityKey,
+        com.sonicvault.app.constants.AudioQuality.HIGH,
+    )
     private val preferredStreamClient by enumPreference(
         this,
         PlayerStreamClientKey,
@@ -374,119 +393,23 @@ class MusicService :
     )
     private val playbackUrlCache = ConcurrentHashMap<String, AuthScopedCacheValue>()
     private val extractorPlaybackUrlCache = ConcurrentHashMap<String, AuthScopedCacheValue>()
+    /**
+     * In "play as video" mode, when the resolved video stream is video-only, this holds the
+     * audio-only companion URL that the [MergingMediaSource] merges in. Keyed by mediaId.
+     */
+    private val videoCompanionAudioUrlCache = ConcurrentHashMap<String, AuthScopedCacheValue>()
     private val remotePlaybackTrackingUrlCache = ConcurrentHashMap<String, String>()
     private val contentLengthCache = ConcurrentHashMap<String, Long>()
 
-    private val VideoModeKeySuffix = ".video"
-
-    // Per-track "play as video" override, keyed by base mediaId. Wins over the global default.
-    private val trackVideoModeOverride = ConcurrentHashMap<String, Boolean>()
-
-    // baseId -> resolved video URL used to build the video source ("" = audio-only fallback).
-    private val mergedVideoUrlCache = ConcurrentHashMap<String, String>()
-    // baseId -> true when the cached video URL is a combined stream (carries audio too).
-    private val mergedVideoCombinedCache = ConcurrentHashMap<String, Boolean>()
-
-    private fun resolveTrackVideoMode(baseId: String): Boolean =
-        trackVideoModeOverride[baseId] ?: runBlocking { dataStore.get(VideoModeEnabledKey, false) }
-
     private fun clearPlaybackResolutionCaches(baseId: String) {
-        val keys = setOf(baseId, baseId + VideoModeKeySuffix)
+        val keys = setOf(baseId)
         playbackUrlCache.keys.removeAll(keys)
         extractorPlaybackUrlCache.keys.removeAll(keys)
+        videoCompanionAudioUrlCache.keys.removeAll(keys)
         contentLengthCache.keys.removeAll(keys)
         audioNormalizationFactorCache.keys.removeAll(keys)
-        mergedVideoCombinedCache.keys.removeAll(keys)
     }
 
-    /** Rebuilds the current track so it resolves as a video (or back to a song). */
-    fun reloadCurrentTrackWithVideoMode(video: Boolean) {
-        val current = player.currentMediaItem ?: return
-        val baseId = current.mediaId
-        if (baseId.isLocalMediaId()) return
-        trackVideoModeOverride[baseId] = video
-        if (video) {
-            // A stale/403'd stream URL must never be replayed on a video retry: invalidate the
-            // resolution+stream caches so every video-mode resolve fetches a fresh URL.
-            YTPlayerUtils.invalidateCachedStreamUrls(baseId)
-        }
-        if (!video) {
-            mergedVideoUrlCache.remove(baseId)
-            mergedVideoCombinedCache.remove(baseId)
-            clearPlaybackResolutionCaches(baseId)
-            rebuildCurrentTrack(baseId, videoMode = false)
-            return
-        }
-        // Resolve a playable video stream off the main thread so prepare() never blocks the UI.
-        scope.launch(Dispatchers.IO) {
-            val resolutionAttempt =
-                runCatching {
-                    YTPlayerUtils.videoOnlyPlaybackUrl(
-                        videoId = baseId,
-                        connectivityManager = connectivityManager,
-                        preferredStreamClient = preferredStreamClient,
-                    )
-                }
-            val resolved = resolutionAttempt.getOrNull()?.getOrNull()
-            val failure =
-                resolutionAttempt.exceptionOrNull()
-                    ?: resolutionAttempt.getOrNull()?.exceptionOrNull()
-            if (failure != null) {
-                // Surface the real reason instead of silently swallowing it — a resolve/decipher/
-                // 403/login failure is very different from "this track genuinely has no video".
-                Timber.tag(TAG).w(
-                    failure,
-                    "Failed to resolve video stream for %s; falling back to audio-only",
-                    baseId,
-                )
-                // YouTube gates most video (and some audio) behind sign-in for GUEST accounts in
-                // 2025+. On a login-gated video, open the existing login-recovery flow instead of
-                // silently showing "No video track in this stream".
-                when (failure) {
-                    is YTPlayerUtils.LoginRequiredForPlaybackException ->
-                        promptLoginRecovery(baseId, failure.targetUrl)
-
-                    is YTPlayerUtils.InvalidPlaybackLoginContextException ->
-                        promptLoginRecovery(baseId, failure.targetUrl)
-
-                    else -> Unit
-                }
-            } else if (resolved == null || resolved.url.isEmpty()) {
-                Timber.tag(TAG).w("No playable video stream for %s; falling back to audio-only", baseId)
-            }
-            clearPlaybackResolutionCaches(baseId)
-            if (resolved != null && resolved.url.isNotEmpty()) {
-                mergedVideoUrlCache[baseId] = resolved.url
-                mergedVideoCombinedCache[baseId] = resolved.combined
-            } else {
-                // No usable video stream (or it requires a login confirmation we can't satisfy) —
-                // fall back to the normal audio path so playback keeps working without erroring.
-                mergedVideoUrlCache.remove(baseId)
-                mergedVideoCombinedCache.remove(baseId)
-                trackVideoModeOverride[baseId] = false
-            }
-            withContext(Dispatchers.Main) {
-                if (player.currentMediaItem?.mediaId == baseId) {
-                    rebuildCurrentTrack(baseId, videoMode = resolved != null && resolved.url.isNotEmpty())
-                }
-            }
-        }
-    }
-
-    private fun rebuildCurrentTrack(
-        baseId: String,
-        videoMode: Boolean,
-    ) {
-        val index = player.currentMediaItemIndex
-        val current = player.currentMediaItem ?: return
-        val positionMs = player.currentPosition
-        val newKey = if (videoMode) baseId + VideoModeKeySuffix else baseId
-        val newItem = current.buildUpon().setCustomCacheKey(newKey).build()
-        player.replaceMediaItem(index, newItem)
-        player.seekTo(index, positionMs)
-        player.prepare()
-        player.play()
-    }
     private val extractorTokenRepository by lazy {
         InMemoryBearerTokenRepository(com.sonicvault.app.BuildConfig.EXTRACTOR_BEARER)
     }
@@ -649,6 +572,10 @@ class MusicService :
     private val audioNormalizationFactorCache = ConcurrentHashMap<String, Float>()
     private var audioNormalizationEnabled = true
     var playerVolume = MutableStateFlow(1f)
+    val videoModeEnabled = MutableStateFlow(false)
+    private var sponsorBlockEnabled = false
+    private val sponsorBlockSegments = ConcurrentHashMap<String, List<SponsorBlock.Segment>>()
+    private val sponsorBlockSkippedSegments = mutableSetOf<Pair<String, Int>>()
     private val audioFocusVolumeFactor = MutableStateFlow(1f)
     private var effectiveVolumeRampJob: Job? = null
     private var crossfadeEnabled = false
@@ -727,6 +654,22 @@ class MusicService :
             processInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND &&
                 processInfo.processName == packageName
         }
+    }
+
+    /**
+     * Resolves the effective stream quality for the current network.
+     *
+     * When [PerNetworkQualityKey] is enabled, metered/cellular connections use
+     * [CellularAudioQualityKey] (Tidal-style per-network preset) while Wi-Fi keeps
+     * the global [AudioQualityKey]. Otherwise the legacy behaviour applies: low-data
+     * mode forces LOW on metered networks.
+     */
+    private fun resolveEffectiveAudioQuality(networkMetered: Boolean): AudioQuality {
+        if (networkMetered) {
+            if (perNetworkQuality) return cellularAudioQuality
+            return AudioQuality.LOW
+        }
+        return audioQuality
     }
 
     private fun promptLoginRecovery(
@@ -1255,6 +1198,19 @@ class MusicService :
                     removeMusicVideoItems()
                 }
             }
+        dataStore.data
+            .map { preferences -> preferences[PlaybackVideoModeKey] ?: false }
+            .distinctUntilChanged()
+            .collect(scope) { enabled ->
+                videoModeEnabled.value = enabled
+            }
+        dataStore.data
+            .map { preferences -> preferences[SponsorBlockEnabledKey] ?: false }
+            .distinctUntilChanged()
+            .collect(scope) { enabled ->
+                sponsorBlockEnabled = enabled
+            }
+        startSponsorBlockSkipper()
         widgetUpdater =
             MusicServiceWidgetUpdater(
                 service = this,
@@ -1372,7 +1328,15 @@ class MusicService :
                         player.play()
                     }
                 }
+                if (isConnected) {
+                    smartOfflineScheduler.maybeRun(connectivityObserver)
+                }
             }
+        }
+        // Give startup a chance to settle before the first smart-offline pass.
+        scope.launch {
+            delay(30_000L)
+            smartOfflineScheduler.maybeRun(connectivityObserver)
         }
 
         combine(playerVolume, normalizeFactor, audioFocusVolumeFactor) { playerVolume, normalizeFactor, audioFocusVolumeFactor ->
@@ -3123,6 +3087,29 @@ class MusicService :
             return 1f
         }
 
+        // Local files have no YouTube loudness data; use the ReplayGain tag
+        // (Poweramp/Namida parity) when present.
+        if (currentMediaId.isLocalMediaId()) {
+            val cached = audioNormalizationFactorCache[currentMediaId]
+            if (cached != null) return cached
+            val factor =
+                runCatching {
+                    val gainDb = ReplayGainParser.readTrackGainDb(this, currentMediaId.toUri())
+                    if (gainDb != null && gainDb.isFinite()) {
+                        val raw = 10f.pow(-gainDb / 20f)
+                        if (raw.isFinite()) {
+                            raw.coerceIn(MIN_AUDIO_NORMALIZATION_FACTOR, MAX_AUDIO_NORMALIZATION_FACTOR)
+                        } else {
+                            1f
+                        }
+                    } else {
+                        1f
+                    }
+                }.getOrDefault(1f)
+            audioNormalizationFactorCache[currentMediaId] = factor
+            return factor
+        }
+
         if (format?.id == currentMediaId) {
             val factor = calculateAudioNormalizationFactor(format, normalizeAudio = true)
             audioNormalizationFactorCache[currentMediaId] = factor
@@ -3605,6 +3592,23 @@ class MusicService :
         }
 
         if (!playbackStreamRecoveryTracker.registerRetryAttempt(mediaId)) {
+            if (videoModeEnabled.value) {
+                Timber.tag("MusicService").w(
+                    "Video stream keeps failing with HTTP %d for %s; reverting to audio mode",
+                    responseException.responseCode,
+                    mediaId,
+                )
+                videoModeEnabled.value = false
+                scope.launch(Dispatchers.IO) {
+                    dataStore.edit { preferences ->
+                        preferences[PlaybackVideoModeKey] = false
+                    }
+                }
+                videoCompanionAudioUrlCache.remove(mediaId)
+                playbackUrlCache.remove(mediaId)
+                YTPlayerUtils.invalidateCachedStreamUrls(mediaId)
+                player.prepare()
+            }
             return false
         }
 
@@ -3613,6 +3617,13 @@ class MusicService :
             mediaId,
             responseException.responseCode,
             requestProfile.variantLabel,
+        )
+        PlaybackDiagnosticsRecorder.recordRetry(
+            mediaId = mediaId,
+            title = player.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() },
+            detail = "Stream HTTP ${responseException.responseCode} from ${requestProfile.variantLabel}",
+            networkMetered = connectivityObserver.isMetered(),
+            wasCached = false,
         )
         player.prepare()
         return true
@@ -5758,6 +5769,160 @@ class MusicService :
         }
     }
 
+    /**
+     * Switches playback between audio-only and audio+video ("play as video") mode.
+     *
+     * The preference is persisted, the current item's cached stream URLs are invalidated
+     * (the cache keys are mode-aware) and the player re-prepares so the next resolve picks
+     * up a combined audio+video stream (preferred) or falls back to the existing audio path.
+     */
+    fun setVideoModeEnabled(enabled: Boolean) {
+        if (videoModeEnabled.value == enabled) return
+        val logMsg =
+            "setVideoModeEnabled($enabled) mediaId=${player.currentMediaItem?.mediaId ?: "<none>"} " +
+                "isLocal=${player.currentMediaItem?.mediaId?.isLocalMediaId()}"
+        android.util.Log.e("SonicVaultVideo", logMsg)
+        Timber.tag("SonicVaultVideo").i(logMsg)
+        videoModeEnabled.value = enabled
+        scope.launch(Dispatchers.IO) {
+            dataStore.edit { preferences ->
+                preferences[PlaybackVideoModeKey] = enabled
+            }
+        }
+        val mediaId = player.currentMediaItem?.mediaId
+        if (mediaId != null && !mediaId.isLocalMediaId()) {
+            playbackUrlCache.remove(mediaId)
+            extractorPlaybackUrlCache.remove(mediaId)
+            videoCompanionAudioUrlCache.remove(mediaId)
+            YTPlayerUtils.invalidateCachedStreamUrls(mediaId)
+        }
+        if (enabled && mediaId != null && !mediaId.isLocalMediaId()) {
+            // Pre-resolve the video stream so the MediaSourceFactory can decide whether to merge
+            // an audio companion (video-only stream) before the player prepares. prepare() runs
+            // after resolution either way; on failure the on-demand data-source resolver retries.
+            scope.launch {
+                val resolution =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            YTPlayerUtils.playerResponseForPlayback(
+                                mediaId,
+                                audioQuality = resolveEffectiveAudioQuality(isLowDataModeActive()),
+                                connectivityManager = connectivityManager,
+                                preferredStreamClient = preferredStreamClient,
+                                networkMetered = isLowDataModeActive(),
+                                video = true,
+                            ).getOrThrow()
+                        }
+                    }
+                resolution.onSuccess { playbackData ->
+                    if (!videoModeEnabled.value) {
+                        // User toggled back to audio while the pre-resolve was in flight; keep audio.
+                        player.prepare()
+                        return@onSuccess
+                    }
+                    android.util.Log.e(
+                        "SonicVaultVideo",
+                        "pre-resolve OK: mime=${playbackData.format.mimeType} itag=${playbackData.format.itag} " +
+                            "companion=${playbackData.companionAudioStreamUrl != null} url=${playbackData.streamUrl?.take(60)}",
+                    )
+                    // Mirror the data-source caching so createMediaSource() can decide whether to
+                    // merge an audio companion (video-only stream) before the player prepares.
+                    val authFingerprint = playbackData.authFingerprint
+                    val expiryMs =
+                        System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
+                    if (!isLowDataModeActive()) {
+                        playbackUrlCache[mediaId] =
+                            AuthScopedCacheValue(
+                                url = playbackData.streamUrl,
+                                expiresAtMs = expiryMs,
+                                authFingerprint = authFingerprint,
+                            )
+                    }
+                    playbackData.companionAudioStreamUrl?.let { companionUrl ->
+                        videoCompanionAudioUrlCache[mediaId] =
+                            AuthScopedCacheValue(
+                                url = companionUrl,
+                                expiresAtMs = expiryMs,
+                                authFingerprint = authFingerprint,
+                            )
+                    }
+                }.onSuccess { playbackData ->
+                    Timber.tag("MusicService").i(
+                        "Video-mode pre-resolve OK for %s: format=%s companion=%s",
+                        mediaId,
+                        playbackData.format.mimeType,
+                        if (playbackData.companionAudioStreamUrl != null) "yes" else "no",
+                    )
+                }.onFailure { throwable ->
+                    android.util.Log.e("SonicVaultVideo", "pre-resolve FAILED for $mediaId: $throwable")
+                    Timber.tag("MusicService").w(
+                        throwable,
+                        "Video-mode pre-resolve failed for %s; reverting to audio mode",
+                        mediaId,
+                    )
+                    // Never break playback: revert to audio-only and re-prepare on the audio stream.
+                    videoModeEnabled.value = false
+                    scope.launch(Dispatchers.IO) {
+                        dataStore.edit { preferences ->
+                            preferences[PlaybackVideoModeKey] = false
+                        }
+                    }
+                    player.prepare()
+                    return@launch
+                }
+                if (videoModeEnabled.value) {
+                    player.prepare()
+                }
+            }
+        } else {
+            player.prepare()
+        }
+    }
+
+    /**
+     * Polls the player position while playing and skips SponsorBlock segments (off-topic talk,
+     * intros, outros) as the position crosses into them. Each segment is skipped at most once
+     * per play so the seek can't loop.
+     */
+    private fun startSponsorBlockSkipper() {
+        scope.launch {
+            while (isActive) {
+                if (!sponsorBlockEnabled || !player.isPlaying) {
+                    delay(750L)
+                    continue
+                }
+                val mediaId = player.currentMediaItem?.mediaId
+                val segments = mediaId?.let { sponsorBlockSegments[it] }.orEmpty()
+                if (mediaId != null && segments.isNotEmpty()) {
+                    val position = player.currentPosition
+                    for ((index, segment) in segments.withIndex()) {
+                        if (position in segment.startMs until (segment.endMs - 100)) {
+                            if (sponsorBlockSkippedSegments.add(mediaId to index)) {
+                                Timber.tag(TAG).i(
+                                    "Skipping SponsorBlock %s segment [%d-%d] for %s",
+                                    segment.category,
+                                    segment.startMs,
+                                    segment.endMs,
+                                    mediaId,
+                                )
+                                PlaybackDiagnosticsRecorder.recordRetry(
+                                    mediaId = mediaId,
+                                    title = player.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() },
+                                    detail = "SponsorBlock skip (${segment.category})",
+                                    networkMetered = connectivityObserver.isMetered(),
+                                    wasCached = false,
+                                )
+                                player.seekTo(segment.endMs)
+                            }
+                            break
+                        }
+                    }
+                }
+                delay(500L)
+            }
+        }
+    }
+
     fun toggleLike() {
         val mediaMetadata = currentMediaMetadata.value ?: return
         ioScope.launch {
@@ -6491,6 +6656,19 @@ class MusicService :
         val timelineEmpty = player.currentTimeline.isEmpty || player.mediaItemCount == 0 || player.currentMediaItem == null
         currentMediaMetadata.value = if (timelineEmpty) null else (mediaItem?.metadata ?: player.currentMetadata)
 
+        mediaItem?.mediaId?.let { newMediaId ->
+            sponsorBlockSkippedSegments.removeAll { it.first == newMediaId }
+            if (sponsorBlockEnabled && !newMediaId.isLocalMediaId()) {
+                scope.launch(Dispatchers.IO) {
+                    val segments = SponsorBlock.fetchSegments(newMediaId).getOrDefault(emptyList())
+                    sponsorBlockSegments[newMediaId] = segments
+                    if (segments.isNotEmpty()) {
+                        Timber.tag(TAG).i("Loaded %d SponsorBlock segments for %s", segments.size, newMediaId)
+                    }
+                }
+            }
+        }
+
         widgetUpdater.update()
 
         scrobbleManager?.onSongStop()
@@ -6675,6 +6853,13 @@ class MusicService :
             (events.contains(Player.EVENT_IS_PLAYING_CHANGED) && player.isPlaying)
         ) {
             playbackStreamRecoveryTracker.onPlaybackRecovered(currentMediaId)
+            if (currentMediaId != null) {
+                PlaybackDiagnosticsRecorder.recordRecovered(
+                    mediaId = currentMediaId,
+                    title = player.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() },
+                    detail = "Playback resumed successfully",
+                )
+            }
             currentMediaId
                 ?.let(playbackUrlCache::get)
                 ?.url
@@ -6978,6 +7163,21 @@ class MusicService :
         val currentMediaId = player.currentMediaItem?.mediaId ?: return
         val isLocalMedia = currentMediaId.isLocalMediaId()
 
+        val errorTitle = player.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
+        val errorDetail =
+            findStreamHttpFailure(error)
+                ?.let { "HTTP ${it.responseCode}" }
+                ?: error.cause?.message?.take(220)
+        PlaybackDiagnosticsRecorder.recordError(
+            mediaId = currentMediaId,
+            title = errorTitle,
+            errorCode = error.errorCode,
+            errorReason = error.errorCodeName,
+            detail = errorDetail,
+            networkMetered = connectivityObserver.isMetered(),
+            wasCached = runCatching { downloadCache.getCachedSpans(currentMediaId).isNotEmpty() || playerCache.getCachedSpans(currentMediaId).isNotEmpty() }.getOrDefault(false),
+        )
+
         val isFullyDownloadedMedia =
             runCatching {
                 val contentLength =
@@ -7139,9 +7339,22 @@ class MusicService :
             }
         }
 
+        val finalTitle = player.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
         if (dataStore.get(AutoSkipNextOnErrorKey, false)) {
+            PlaybackDiagnosticsRecorder.recordSkippedOrStopped(
+                mediaId = currentMediaId,
+                title = finalTitle,
+                skipped = true,
+                detail = "Unrecoverable error ${error.errorCodeName}; auto-skipping",
+            )
             skipOnError()
         } else {
+            PlaybackDiagnosticsRecorder.recordSkippedOrStopped(
+                mediaId = currentMediaId,
+                title = finalTitle,
+                skipped = false,
+                detail = "Unrecoverable error ${error.errorCodeName}; stopped",
+            )
             stopOnError()
         }
     }
@@ -7285,10 +7498,24 @@ class MusicService :
         if (dataSpec.uri.shouldBypassYouTubeResolver()) {
             return dataSpec
         }
+        // The "play as video" merged audio source requests a synthetic URI; resolve it to the
+        // cached audio-only companion stream URL, or an empty stream if none is available.
+        if (dataSpec.uri.scheme?.equals(VIDEO_COMPANION_AUDIO_SCHEME, ignoreCase = true) == true) {
+            val companionMediaId = dataSpec.uri.host ?: dataSpec.key ?: return dataSpec
+            val authFingerprint = YouTube.currentPlaybackAuthState().fingerprint
+            val companion =
+                videoCompanionAudioUrlCache[companionMediaId]
+                    ?.takeIf { it.isValidFor(authFingerprint) }
+            return if (companion != null) {
+                dataSpec.withUri(companion.url.toUri())
+            } else {
+                // No companion (combined stream or expired): contribute zero bytes so the
+                // merged audio source ends immediately without affecting the video source.
+                dataSpec.withUri(dataSpec.uri).subrange(0L, 0L)
+            }
+        }
         val key = dataSpec.key ?: return dataSpec
-        val isVideoMode = key.endsWith(VideoModeKeySuffix)
-        // mediaId is the YouTube/base id; only the URL/content caches are keyed by the mode-suffixed key.
-        val mediaId = if (isVideoMode) key.removeSuffix(VideoModeKeySuffix) else key
+        val mediaId = key
         val storedFormat =
             runBlocking(Dispatchers.IO) {
                 database.format(mediaId).first()
@@ -7340,7 +7567,7 @@ class MusicService :
         }
 
         val lowDataModeActive = isLowDataModeActive()
-        if (preferredStreamClient == PlayerStreamClient.ARCHIVETUNE_EXTRACTOR) {
+        if (preferredStreamClient == PlayerStreamClient.SONICVAULT_EXTRACTOR) {
             return resolveSonicVaultExtractorDataSpec(
                 dataSpec = dataSpec,
                 mediaId = mediaId,
@@ -7376,10 +7603,11 @@ class MusicService :
                 retryWithoutPlaybackLoginContext {
                     YTPlayerUtils.playerResponseForPlayback(
                         mediaId,
-                        audioQuality = if (lowDataModeActive) AudioQuality.LOW else audioQuality,
+                        audioQuality = resolveEffectiveAudioQuality(lowDataModeActive),
                         connectivityManager = connectivityManager,
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = lowDataModeActive,
+                        video = videoModeEnabled.value,
                     )
                 }.recoverCatching { youtubeFailure ->
                     if (youtubeFailure !is YTPlayerUtils.BotDetectionPlaybackException) throw youtubeFailure
@@ -7495,22 +7723,20 @@ class MusicService :
                 perceptualLoudnessDb = perceptualLoudnessDb,
                 playbackUrl = nonNullPlayback.playbackTracking?.videostatsPlaybackUrl?.baseUrl,
             )
-        if (!isVideoMode) {
-            val resolvedNormalizationFactor = calculateAudioNormalizationFactor(formatEntity, normalizeAudio = true)
-            audioNormalizationFactorCache[mediaId] = resolvedNormalizationFactor
-            scope.launch {
-                if (currentMediaMetadata.value?.id == mediaId &&
-                    dataStore.get(AudioNormalizationKey, true)
-                ) {
-                    normalizeFactor.value = resolvedNormalizationFactor
-                }
+        val resolvedNormalizationFactor = calculateAudioNormalizationFactor(formatEntity, normalizeAudio = true)
+        audioNormalizationFactorCache[mediaId] = resolvedNormalizationFactor
+        scope.launch {
+            if (currentMediaMetadata.value?.id == mediaId &&
+                dataStore.get(AudioNormalizationKey, true)
+            ) {
+                normalizeFactor.value = resolvedNormalizationFactor
             }
+        }
 
-            database.query {
-                upsert(
-                    formatEntity,
-                )
-            }
+        database.query {
+            upsert(
+                formatEntity,
+            )
         }
         scope.launch(Dispatchers.IO) { recoverSong(mediaId, nonNullPlayback) }
 
@@ -7522,6 +7748,14 @@ class MusicService :
             playbackUrlCache[key] =
                 AuthScopedCacheValue(
                     url = streamUrl,
+                    expiresAtMs = trackingExpiryMs,
+                    authFingerprint = nonNullPlayback.authFingerprint,
+                )
+        }
+        nonNullPlayback.companionAudioStreamUrl?.let { companionUrl ->
+            videoCompanionAudioUrlCache[key] =
+                AuthScopedCacheValue(
+                    url = companionUrl,
                     expiresAtMs = trackingExpiryMs,
                     authFingerprint = nonNullPlayback.authFingerprint,
                 )
@@ -7585,7 +7819,7 @@ class MusicService :
                         )
                     }
 
-                    throwable is ArchiveTuneExtractorException -> {
+                    throwable is SonicVaultExtractorException -> {
                         throw PlaybackException(
                             getString(R.string.error_no_stream),
                             throwable,
@@ -7743,30 +7977,26 @@ class MusicService :
                 )
 
             override fun createMediaSource(mediaItem: MediaItem): MediaSource {
-                val cacheKey = mediaItem.localConfiguration?.customCacheKey
-                if (cacheKey != null && cacheKey.endsWith(VideoModeKeySuffix)) {
-                    val baseId = cacheKey.removeSuffix(VideoModeKeySuffix)
-                    // The video URL is resolved asynchronously and cached, so this never blocks prepare.
-                    val videoUrl = mergedVideoUrlCache[baseId]
-                    if (!videoUrl.isNullOrEmpty()) {
-                        val videoDataSource =
-                            DefaultDataSource.Factory(this@MusicService, OkHttpDataSource.Factory(mediaOkHttpClient))
-                        val videoSource =
-                            ProgressiveMediaSource
-                                .Factory(videoDataSource)
-                                .createMediaSource(MediaItem.fromUri(videoUrl))
-                        if (mergedVideoCombinedCache[baseId] == true) {
-                            // Combined stream carries audio + video — play it directly.
-                            return videoSource
-                        }
-                        // Video-only stream — merge with the normal audio source.
-                        val audioSource = delegate.createMediaSource(mediaItem)
-                        return MergingMediaSource(audioSource, videoSource)
-                    }
-                    // No resolved video stream available — fall back to audio only.
-                    return delegate.createMediaSource(mediaItem)
-                }
-                return delegate.createMediaSource(mediaItem)
+                val source = delegate.createMediaSource(mediaItem)
+                if (!videoModeEnabled.value) return source
+                val mediaId = mediaItem.mediaId
+                if (mediaId.isBlank() || mediaId.isLocalMediaId()) return source
+                if (mediaItem.localConfiguration?.uri?.shouldBypassYouTubeResolver() == true) return source
+                val companion = videoCompanionAudioUrlCache[mediaId]
+                android.util.Log.e(
+                    "SonicVaultVideo",
+                    "createMediaSource(videoMode, mediaId=$mediaId, companion=${companion != null})",
+                )
+                if (companion == null) return source
+                val audioItem =
+                    mediaItem
+                        .buildUpon()
+                        .setUri("$VIDEO_COMPANION_AUDIO_SCHEME://$mediaId".toUri())
+                        // Distinct cache key so the audio source never collides with the video
+                        // source's bytes in the player/download cache.
+                        .setCustomCacheKey("$VIDEO_COMPANION_AUDIO_SCHEME:$mediaId")
+                        .build()
+                return MergingMediaSource(source, delegate.createMediaSource(audioItem))
             }
 
             override fun getSupportedTypes(): IntArray = delegate.supportedTypes
@@ -8661,6 +8891,7 @@ class MusicService :
         const val STUCK_MUTED_VOLUME_EPSILON = 0.001f
         const val AUDIBLE_PLAYBACK_VOLUME_CHECK_MS = 2_000L
         private const val SonicVaultExtractorHost = "moriextractor.koyeb.app"
+        private const val VIDEO_COMPANION_AUDIO_SCHEME = "sonicvault-audio"
         private const val SonicVaultExtractorCacheFingerprintPrefix = "sonicvault_extractor:"
         private const val SonicVaultExtractorExpirySafetyMs = 30_000L
     }

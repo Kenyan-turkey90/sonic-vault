@@ -7,7 +7,7 @@
 
 package com.sonicvault.app.models
 
-import moe.rukamori.archivetune.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.YTItem
 
 data class ItemsPage(
     val items: List<YTItem>,

@@ -187,7 +187,8 @@ import com.sonicvault.app.constants.SliderStyleKey
 import com.sonicvault.app.constants.ThumbnailCornerRadiusKey
 import com.sonicvault.app.extensions.metadata
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.extensions.toggleRepeatMode
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.ui.component.BottomSheet
 import com.sonicvault.app.ui.component.BottomSheetState
@@ -205,6 +206,7 @@ import com.sonicvault.app.ui.utils.YtimgResizePolicy
 import com.sonicvault.app.ui.utils.getNextFallbackUrl
 import com.sonicvault.app.ui.utils.resize
 import com.sonicvault.app.utils.ImageBlurUtils
+import com.sonicvault.app.utils.isLocalMediaId
 import com.sonicvault.app.utils.makeTimeString
 import com.sonicvault.app.utils.rememberEnumPreference
 import com.sonicvault.app.utils.rememberLowDataModeActive
@@ -457,14 +459,21 @@ fun BottomSheetPlayer(
         }
 
     val repeatMode by playerConnection.repeatMode.collectAsState()
+    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
 
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
 
     val aodModeEnabled by playerConnection.aodModeEnabled.collectAsStateWithLifecycle()
+    val videoModeEnabled by playerConnection.service.videoModeEnabled.collectAsState()
+    val videoModeAvailable =
+        remember(mediaMetadata) {
+            val id = mediaMetadata?.id
+            id != null && id.isNotBlank() && !id.isLocalMediaId()
+        }
     val currentLyricsEntity by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val (thumbnailCornerRadius) = rememberPreference(ThumbnailCornerRadiusKey, defaultValue = 8f)
-    val archiveTuneCanvasEnabled by rememberPreference(SonicVaultCanvasKey, false)
+    val sonicVaultCanvasEnabled by rememberPreference(SonicVaultCanvasKey, false)
     val lowDataModeActive = rememberLowDataModeActive()
     val (maxCanvasCacheSize, _) =
         rememberPreference(
@@ -856,6 +865,9 @@ fun BottomSheetPlayer(
         }
     }
 
+    val videoOverlayDragDisabled =
+        videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+
     BottomSheet(
         state = state,
         modifier =
@@ -1000,6 +1012,7 @@ fun BottomSheetPlayer(
         onDismiss = {
             playerConnection.service.stopAndClearPlayback(clearPersistentState = true)
         },
+        dragEnabled = !videoOverlayDragDisabled,
         collapsedContent = {
             MiniPlayer(
                 position = position,
@@ -1072,11 +1085,11 @@ fun BottomSheetPlayer(
                 if (country.length == 2) country.lowercase(Locale.ROOT) else "us"
             }
         val shouldUseV7Canvas =
-            archiveTuneCanvasEnabled &&
+            sonicVaultCanvasEnabled &&
                 playerDesignStyle == PlayerDesignStyle.V7 &&
                 !aodModeEnabled
         val shouldUseArtworkCanvas =
-            archiveTuneCanvasEnabled &&
+            sonicVaultCanvasEnabled &&
                 (playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V9) &&
                 !aodModeEnabled
         val shouldFetchV7Canvas = shouldUseV7Canvas && !lowDataModeActive
@@ -1211,7 +1224,7 @@ fun BottomSheetPlayer(
                 context = context,
                 onSliderValueChange = onSliderValueChange,
                 onSliderValueChangeFinished = onSliderValueChangeFinished,
-                currentFormat = if (playerDesignStyle == PlayerDesignStyle.V7) currentFormat else null,
+                currentFormat = currentFormat,
             )
 
             }
@@ -1239,6 +1252,12 @@ fun BottomSheetPlayer(
         
 // distance
 
+        Box(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+        val videoOverlayActive =
+            videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+        if (!videoOverlayActive) {
         when (LocalConfiguration.current.orientation) {
             Configuration.ORIENTATION_LANDSCAPE -> {
                 if (playerDesignStyle == PlayerDesignStyle.V5) {
@@ -1781,6 +1800,72 @@ fun BottomSheetPlayer(
             }
         }
 
+        }
+
+        if (videoModeAvailable && !aodModeEnabled) {
+            if (videoOverlayActive) {
+                VideoModeOverlay(
+                    player = playerConnection.player,
+                    mediaMetadata = mediaMetadata,
+                    isPlaying = isPlaying,
+                    isLoading = isLoading,
+                    position = position,
+                    duration = duration,
+                    sliderPosition = sliderPosition,
+                    shuffleModeEnabled = shuffleModeEnabled,
+                    repeatMode = repeatMode,
+                    onPlayPause = { playerConnection.player.togglePlayPause() },
+                    onSkipPrevious = playerConnection::seekToPrevious,
+                    onSkipNext = playerConnection::seekToNext,
+                    onSwipeUpToSkip = { playerConnection.seekToNext() },
+                    onSliderValueChange = { newValue ->
+                        sliderPosition = newValue
+                    },
+                    onSliderValueChangeFinished = {
+                        sliderPosition?.let { target ->
+                            playerConnection.player.seekTo(target)
+                            sliderPosition = null
+                        }
+                    },
+                    onToggleShuffle = {
+                        playerConnection.player.shuffleModeEnabled =
+                            !playerConnection.player.shuffleModeEnabled
+                    },
+                    onToggleRepeat = { playerConnection.player.toggleRepeatMode() },
+                    onToggleFullscreen = {
+                        (context as? android.app.Activity)?.let { act ->
+                            val isCurrentlyLandscape =
+                                act.requestedOrientation ==
+                                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE ||
+                                    act.requestedOrientation ==
+                                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE ||
+                                    act.requestedOrientation ==
+                                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+                            act.requestedOrientation =
+                                if (isCurrentlyLandscape) {
+                                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                } else {
+                                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                }
+                        }
+                    },
+                    onExit = { playerConnection.service.setVideoModeEnabled(false) },
+                )
+            } else if (!videoModeEnabled && state.isExpanded) {
+                VideoModeToggleChip(
+                    containerColor = Color.Black.copy(alpha = 0.55f),
+                    contentColor = Color.White,
+                    onClick = { playerConnection.service.setVideoModeEnabled(true) },
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(top = 12.dp, end = 16.dp),
+                )
+            }
+        }
+        }
+
         val queueOnBackgroundColor = if (useBlackBackground) Color.White else MaterialTheme.colorScheme.onSurface
         val queueSurfaceColor = if (useBlackBackground) Color.Black else MaterialTheme.colorScheme.surface
 
@@ -1798,35 +1883,39 @@ fun BottomSheetPlayer(
                 }
             }
 
-        Queue(
-            state = queueSheetState,
-            playerBottomSheetState = state,
-            navController = navController,
-            backgroundColor =
-                if (useBlackBackground) {
-                    Color.Black
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-            onBackgroundColor = queueOnBackgroundColor,
-            TextBackgroundColor = TextBackgroundColor,
-            textButtonColor = textButtonColor,
-            iconButtonColor = iconButtonColor,
-            onShowLyrics = { isLyricsScreenVisible = true },
-            pureBlack = pureBlack,
-        )
-
-        mediaMetadata?.let { metadata ->
-            MikoLyricsTransition(
-                visible = isLyricsScreenVisible,
-                backHandlerEnabled = isLyricsScreenVisible && state.isExpandedOrExpanding,
-                mediaMetadata = metadata,
+        val queueHiddenByVideo =
+            videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+        if (!queueHiddenByVideo) {
+            Queue(
+                state = queueSheetState,
+                playerBottomSheetState = state,
                 navController = navController,
-                lyricsSyncOffset = lyricsSyncOffset,
-                onLyricsSyncOffsetChange = { lyricsSyncOffset = it },
-                onDismiss = { isLyricsScreenVisible = false },
-                onQueueClick = openQueue,
+                backgroundColor =
+                    if (useBlackBackground) {
+                        Color.Black
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    },
+                onBackgroundColor = queueOnBackgroundColor,
+                TextBackgroundColor = TextBackgroundColor,
+                textButtonColor = textButtonColor,
+                iconButtonColor = iconButtonColor,
+                onShowLyrics = { isLyricsScreenVisible = true },
+                pureBlack = pureBlack,
             )
+
+            mediaMetadata?.let { metadata ->
+                MikoLyricsTransition(
+                    visible = isLyricsScreenVisible,
+                    backHandlerEnabled = isLyricsScreenVisible && state.isExpandedOrExpanding,
+                    mediaMetadata = metadata,
+                    navController = navController,
+                    lyricsSyncOffset = lyricsSyncOffset,
+                    onLyricsSyncOffsetChange = { lyricsSyncOffset = it },
+                    onDismiss = { isLyricsScreenVisible = false },
+                    onQueueClick = openQueue,
+                )
+            }
         }
 
         AnimatedVisibility(

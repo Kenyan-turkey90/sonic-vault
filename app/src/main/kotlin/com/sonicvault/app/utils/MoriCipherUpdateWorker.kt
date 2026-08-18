@@ -17,8 +17,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import moe.rukamori.archivetune.morideobfuscator.CipherRuntimeStatus
-import moe.rukamori.archivetune.morideobfuscator.MoriCipherRuntime
+import com.sonicvault.app.morideobfuscator.CipherRuntimeStatus
+import com.sonicvault.app.morideobfuscator.MoriCipherRuntime
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 

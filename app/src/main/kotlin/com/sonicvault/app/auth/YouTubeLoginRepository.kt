@@ -23,10 +23,10 @@ import com.sonicvault.app.constants.SavedAccountsKey
 import com.sonicvault.app.constants.SelectedYtmPlaylistsKey
 import com.sonicvault.app.constants.VisitorDataKey
 import com.sonicvault.app.constants.YtmSyncKey
-import moe.rukamori.archivetune.innertube.PlaybackAuthState
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AccountInfo
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.PlaybackAuthState
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AccountInfo
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.utils.SavedAccount
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.decodeSavedAccounts

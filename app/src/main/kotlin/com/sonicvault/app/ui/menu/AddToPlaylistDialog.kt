@@ -90,8 +90,8 @@ import com.sonicvault.app.LocalDatabase
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.InnerTubeCookieKey
 import com.sonicvault.app.db.entities.Playlist
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.ui.component.CreatePlaylistDialog
 import com.sonicvault.app.ui.component.DefaultDialog
 import com.sonicvault.app.ui.component.PlaylistListItem

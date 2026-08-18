@@ -22,7 +22,7 @@ import com.sonicvault.app.auth.CompleteYouTubeLoginUseCase
 import com.sonicvault.app.auth.MissingYouTubeDataSyncIdException
 import com.sonicvault.app.auth.SaveYouTubePoTokenUseCase
 import com.sonicvault.app.auth.UpdateYouTubeLoginContextUseCase
-import moe.rukamori.archivetune.innertube.PlaybackAuthState
+import com.sonicvault.app.innertube.PlaybackAuthState
 import timber.log.Timber
 import javax.inject.Inject
 

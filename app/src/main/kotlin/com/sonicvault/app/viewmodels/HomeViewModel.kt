@@ -43,19 +43,20 @@ import com.sonicvault.app.extensions.filterBlockedArtists
 import com.sonicvault.app.extensions.toEnum
 import com.sonicvault.app.home.HomeAction
 import com.sonicvault.app.home.HomePresentationPreferences
+import com.sonicvault.app.home.SmartMixUseCase
 import com.sonicvault.app.home.HomeScreenState
 import com.sonicvault.app.home.HomeUiState
 import com.sonicvault.app.home.ObserveHomePresentationPreferencesUseCase
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AccountChannel
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
-import moe.rukamori.archivetune.innertube.models.YTItem
-import moe.rukamori.archivetune.innertube.models.filterExplicit
-import moe.rukamori.archivetune.innertube.models.filterVideo
-import moe.rukamori.archivetune.innertube.pages.HomePage
-import moe.rukamori.archivetune.innertube.utils.completed
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AccountChannel
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.filterExplicit
+import com.sonicvault.app.innertube.models.filterVideo
+import com.sonicvault.app.innertube.pages.HomePage
+import com.sonicvault.app.innertube.utils.completed
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.models.SimilarRecommendation
 import com.sonicvault.app.utils.SavedAccount
 import com.sonicvault.app.utils.SpeedDialPinType
@@ -102,6 +103,7 @@ private data class HomeLocalContent(
     val speedDialItems: List<LocalItem>,
     val forgottenFavorites: List<Song>,
     val keepListening: List<LocalItem>,
+    val smartMix: SmartMixUseCase.SmartMix?,
 )
 
 private data class HomeRemoteContent(
@@ -123,6 +125,7 @@ private data class HomeContent(
                 local.speedDialItems.isNotEmpty() ||
                 local.forgottenFavorites.isNotEmpty() ||
                 local.keepListening.isNotEmpty() ||
+                (local.smartMix?.songs?.isNotEmpty() == true) ||
                 remote.similarRecommendations.isNotEmpty() ||
                 remote.accountPlaylists.isNotEmpty() ||
                 remote.homePage?.sections?.any { it.items.isNotEmpty() } == true
@@ -155,6 +158,7 @@ private data class HomeStateInputs(
                 speedDialItems = ImmutableList.copyOf(content.local.speedDialItems),
                 forgottenFavorites = ImmutableList.copyOf(content.local.forgottenFavorites),
                 keepListening = ImmutableList.copyOf(content.local.keepListening),
+                smartMix = content.local.smartMix,
                 similarRecommendations = ImmutableList.copyOf(content.remote.similarRecommendations),
                 accountPlaylists = ImmutableList.copyOf(content.remote.accountPlaylists),
                 homePage = content.remote.homePage,
@@ -183,6 +187,7 @@ class HomeViewModel
         observeAiContentFilter: ObserveAiContentFilterUseCase,
         private val loadAiContentFilterPolicy: LoadAiContentFilterPolicyUseCase,
         private val filterAiContent: FilterAiContentUseCase,
+        private val smartMixUseCase: SmartMixUseCase,
     ) : ViewModel() {
         private val isRefreshing = MutableStateFlow(false)
         private val isLoading = MutableStateFlow(false)
@@ -200,6 +205,7 @@ class HomeViewModel
         private val speedDialItems = MutableStateFlow<List<LocalItem>>(emptyList())
         private val forgottenFavorites = MutableStateFlow<List<Song>?>(null)
         private val keepListening = MutableStateFlow<List<LocalItem>?>(null)
+        private val smartMix = MutableStateFlow<SmartMixUseCase.SmartMix?>(null)
         private val similarRecommendations = MutableStateFlow<List<SimilarRecommendation>?>(null)
         private val accountPlaylists = MutableStateFlow<List<PlaylistItem>?>(null)
         private val homePage = MutableStateFlow<HomePage?>(null)
@@ -230,12 +236,14 @@ class HomeViewModel
                 speedDialItems,
                 forgottenFavorites,
                 keepListening,
-            ) { quickPicks, speedDialItems, forgottenFavorites, keepListening ->
+                smartMix,
+            ) { quickPicks, speedDialItems, forgottenFavorites, keepListening, smartMix ->
                 HomeLocalContent(
                     quickPicks = quickPicks.orEmpty(),
                     speedDialItems = speedDialItems,
                     forgottenFavorites = forgottenFavorites.orEmpty(),
                     keepListening = keepListening.orEmpty(),
+                    smartMix = smartMix,
                 )
             }
 
@@ -475,6 +483,14 @@ class HomeViewModel
                                 .filter { song -> song.artists.none { it.blockedAt != null } }
                                 .shuffled()
                                 .take(20)
+                    }
+
+                    launch {
+                        smartMix.value =
+                            smartMixUseCase(
+                                limit = 24,
+                                forceAiNarration = true,
+                            ).takeIf { it.songs.isNotEmpty() }
                     }
 
                     launch {

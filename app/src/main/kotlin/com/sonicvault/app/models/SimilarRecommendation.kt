@@ -8,7 +8,7 @@
 package com.sonicvault.app.models
 
 import com.sonicvault.app.db.entities.LocalItem
-import moe.rukamori.archivetune.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.YTItem
 
 data class SimilarRecommendation(
     val title: LocalItem,

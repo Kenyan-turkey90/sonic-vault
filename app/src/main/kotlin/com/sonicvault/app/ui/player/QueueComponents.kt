@@ -116,6 +116,8 @@ fun CurrentSongHeader(
     onShuffleClick: () -> Unit,
     onLockClick: () -> Unit,
     onInfiniteQueueClick: () -> Unit,
+    onSaveQueueClick: () -> Unit,
+    onSavedQueuesClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
@@ -240,6 +242,34 @@ fun CurrentSongHeader(
                     Icon(
                         painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
                         contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                IconButton(
+                    onClick = onSaveQueueClick,
+                    modifier = Modifier.size(40.dp),
+                    colors =
+                        IconButtonDefaults.iconButtonColors(
+                            contentColor = onBackgroundColor.copy(alpha = 0.7f),
+                        ),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.bookmark),
+                        contentDescription = stringResource(R.string.save_queue),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                IconButton(
+                    onClick = onSavedQueuesClick,
+                    modifier = Modifier.size(40.dp),
+                    colors =
+                        IconButtonDefaults.iconButtonColors(
+                            contentColor = onBackgroundColor.copy(alpha = 0.7f),
+                        ),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.bookmark_filled),
+                        contentDescription = stringResource(R.string.saved_queues),
                         modifier = Modifier.size(20.dp),
                     )
                 }

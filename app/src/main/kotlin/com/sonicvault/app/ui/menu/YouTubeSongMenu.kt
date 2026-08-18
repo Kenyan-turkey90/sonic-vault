@@ -84,8 +84,8 @@ import com.sonicvault.app.constants.SpeedDialSongIdsKey
 import com.sonicvault.app.constants.ThumbnailCornerRadius
 import com.sonicvault.app.db.entities.SongEntity
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.ExoDownloadService

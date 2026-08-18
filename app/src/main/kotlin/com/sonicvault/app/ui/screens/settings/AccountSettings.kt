@@ -105,8 +105,8 @@ import com.sonicvault.app.constants.SelectedYtmPlaylistsKey
 import com.sonicvault.app.constants.UseLoginForBrowse
 import com.sonicvault.app.constants.VisitorDataKey
 import com.sonicvault.app.constants.YtmSyncKey
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.ui.component.IconButton
 import com.sonicvault.app.ui.component.InfoLabel
 import com.sonicvault.app.ui.component.TextFieldDialog

@@ -45,10 +45,10 @@ import com.sonicvault.app.extensions.filterBlockedArtists
 import com.sonicvault.app.extensions.filterExplicit
 import com.sonicvault.app.extensions.filterExplicitAlbums
 import com.sonicvault.app.extensions.filterVideo
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.filterExplicit
-import moe.rukamori.archivetune.innertube.models.filterVideo
-import moe.rukamori.archivetune.innertube.pages.ArtistPage
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.filterExplicit
+import com.sonicvault.app.innertube.models.filterVideo
+import com.sonicvault.app.innertube.pages.ArtistPage
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 import com.sonicvault.app.utils.reportException

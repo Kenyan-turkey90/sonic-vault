@@ -64,6 +64,19 @@ class NetworkConnectivityObserver(
     }
 
     /**
+     * Check whether the active network is metered (cellular / hotspot) synchronously.
+     * Falls back to false (unmetered) when no network is available.
+     */
+    fun isMetered(): Boolean =
+        try {
+            val activeNetwork = connectivityManager.activeNetwork
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+            networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == false
+        } catch (e: Exception) {
+            false
+        }
+
+    /**
      * Check current connectivity state synchronously
      */
     fun isCurrentlyConnected(): Boolean =

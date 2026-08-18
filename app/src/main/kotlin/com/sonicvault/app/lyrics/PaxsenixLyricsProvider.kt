@@ -9,7 +9,7 @@ package com.sonicvault.app.lyrics
 
 import android.content.Context
 import com.sonicvault.app.constants.EnablePaxsenixLyricsKey
-import moe.rukamori.archivetune.paxsenix.PaxsenixLyrics
+import com.sonicvault.app.paxsenix.PaxsenixLyrics
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 

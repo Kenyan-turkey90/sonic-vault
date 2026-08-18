@@ -7,12 +7,12 @@
 
 package com.sonicvault.app.extensions
 
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.YTItem
-import moe.rukamori.archivetune.innertube.pages.BrowseResult
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.YTItem
+import com.sonicvault.app.innertube.pages.BrowseResult
 
 fun <T : YTItem> List<T>.filterBlockedArtists(blockedArtistIds: Set<String>): List<T> {
     if (blockedArtistIds.isEmpty()) return this

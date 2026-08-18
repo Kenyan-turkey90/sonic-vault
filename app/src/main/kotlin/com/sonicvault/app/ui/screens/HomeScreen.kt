@@ -361,6 +361,25 @@ private fun HomeContent(
                         }
                     }
 
+                    if (uiState.smartMix?.songs?.isNotEmpty() == true) {
+                        sectionSpacer("smart_mix")
+                        item(
+                            key = "home_smart_mix",
+                            contentType = "smart_mix",
+                        ) {
+                            SmartMixSection(
+                                smartMix = uiState.smartMix,
+                                mediaMetadata = mediaMetadata,
+                                isPlaying = isPlaying,
+                                navController = navController,
+                                playerConnection = playerConnection,
+                                menuState = menuState,
+                                haptic = haptic,
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                    }
+
                     if (uiState.speedDialItems.isNotEmpty()) {
                         sectionSpacer("speed_dial")
                         item(

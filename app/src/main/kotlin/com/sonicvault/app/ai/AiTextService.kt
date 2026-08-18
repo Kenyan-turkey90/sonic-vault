@@ -140,6 +140,42 @@ object AiTextService {
         }
     }
 
+    /**
+     * Generates a short DJ-style narration for a Smart Mix from the given track list.
+     * Returns a title and a one-line description. Fails when AI is not configured,
+     * so callers must fall back to a local default.
+     */
+    suspend fun narrateSmartMix(
+        config: AiServiceConfig,
+        songTitles: List<String>,
+    ): Pair<String, String> {
+        if (songTitles.isEmpty()) throw AiServiceException("No songs to narrate")
+        val sample = songTitles.take(12)
+        val response =
+            complete(
+                config = config,
+                systemPrompt =
+                    "You are a music DJ curating a personal mix. Write a short, warm, energetic " +
+                        "introduction for a playlist of the user's most-played songs. " +
+                        "Return a JSON object with exactly two string fields: 'title' (max 40 chars) and " +
+                        "'description' (max 140 chars, one sentence). No markdown, no extra text.",
+                userPrompt = "Songs: ${sample.joinToString(", ")}",
+                temperature = 0.9,
+                maxTokens = 256,
+            )
+        val obj = JSONObject(extractJsonObject(response))
+        val title = obj.optString("title").trim().ifBlank { "Your Smart Mix" }
+        val description = obj.optString("description").trim()
+        return title to description
+    }
+
+    private fun extractJsonObject(response: String): String {
+        val start = response.indexOf('{')
+        val end = response.lastIndexOf('}')
+        if (start < 0 || end <= start) throw AiServiceException("AI response was not valid JSON")
+        return response.substring(start, end + 1)
+    }
+
     suspend fun fetchModels(config: AiServiceConfig): List<AiModelOption> {
         if (!config.canCallApi) throw AiServiceException("AI provider is not configured")
         return when (config.provider) {

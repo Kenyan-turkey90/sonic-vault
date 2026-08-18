@@ -447,8 +447,8 @@
     <string name="corner_radius">نصف قطر الزاوية: %1$d</string>
     <string name="adjust_radius">ضبط نصف قطر الزاوية</string>
     <string name="custom_radius">تخصيص نصف قطر زاوية الصورة المصغرة</string>
-    <string name="archivetune_canvas">خلفية متحركة (SonicVault Canvas)</string>
-    <string name="archivetune_canvas_desc">تحريك غلاف الألبوم أثناء التشغيل (بواسطة BetterLyrics)</string>
+    <string name="sonicvault_canvas">خلفية متحركة (SonicVault Canvas)</string>
+    <string name="sonicvault_canvas_desc">تحريك غلاف الألبوم أثناء التشغيل (بواسطة BetterLyrics)</string>
     <string name="player_background_style_v8_v9_desc">غير متاح مع تصميم المشغل V8 و V9</string>
     <string name="show_button1_description">تبديل رؤية الزر 1 في حالة حضور Discord</string>
     <string name="show_button2_description">تبديل رؤية الزر 2 في حالة حضور Discord</string>

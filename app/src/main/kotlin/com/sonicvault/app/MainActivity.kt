@@ -228,11 +228,11 @@ import com.sonicvault.app.db.entities.Playlist
 import com.sonicvault.app.db.entities.SearchHistory
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.musicrecognition.ACTION_MUSIC_RECOGNITION
 import com.sonicvault.app.musicrecognition.MusicRecognitionRoute
@@ -1328,7 +1328,17 @@ class MainActivity : ComponentActivity() {
                             }
                         } else {
                             if (!isYearInMusicScreen) {
-                                when (savedMiniPlayerAnchor) {
+                                // Only warm restarts within the same process restore the
+                                // expanded now-playing sheet. A fresh process start always
+                                // lands on the Home page with the mini player collapsed,
+                                // so the app never reopens straight into the player.
+                                val anchorToRestore =
+                                    if (hasRestoredMiniPlayerAnchorInProcess) {
+                                        savedMiniPlayerAnchor
+                                    } else {
+                                        COLLAPSED_ANCHOR
+                                    }
+                                when (anchorToRestore) {
                                     EXPANDED_ANCHOR -> playerBottomSheetState.expandSoft()
                                     COLLAPSED_ANCHOR -> playerBottomSheetState.collapseSoft()
                                     DISMISSED_ANCHOR -> playerBottomSheetState.collapseSoft()
@@ -1337,6 +1347,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         restoredMiniPlayerAnchor = true
+                        hasRestoredMiniPlayerAnchorInProcess = true
                         miniPlayerAnchorPersistenceEnabled = true
                     }
 
@@ -1519,9 +1530,12 @@ class MainActivity : ComponentActivity() {
                         com.sonicvault.app.ui.component.LocalBottomSheetPageState provides bottomSheetPageState,
                         com.sonicvault.app.ui.component.LocalMenuState provides menuState,
                     ) {
+                        val videoModeActive by
+                            (LocalPlayerConnection.current?.service?.videoModeEnabled ?: remember { MutableStateFlow(false) })
+                                .collectAsStateWithLifecycle()
                         Row {
                             AnimatedVisibility(
-                                visible = useRail && shouldShowNavigationBar,
+                                visible = useRail && shouldShowNavigationBar && !videoModeActive,
                                 enter = fadeIn(animationSpec = tween(durationMillis = if (disableAnimations) 0 else 150)),
                                 exit = fadeOut(animationSpec = tween(durationMillis = if (disableAnimations) 0 else 100)),
                             ) {
@@ -2878,6 +2892,12 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_SEARCH = "com.sonicvault.app.action.SEARCH"
         const val ACTION_LIBRARY = "com.sonicvault.app.action.LIBRARY"
+
+        // Process-lifetime flag: lets activity recreations (rotation, config
+        // changes) restore the expanded player sheet, while a fresh process
+        // start always opens on Home instead of the now-playing screen.
+        @Volatile
+        private var hasRestoredMiniPlayerAnchorInProcess = false
     }
 }
 

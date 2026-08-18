@@ -67,6 +67,7 @@ fun BottomSheet(
     modifier: Modifier = Modifier,
     backgroundColor: Color,
     onDismiss: (() -> Unit)? = null,
+    dragEnabled: Boolean = true,
     collapsedContent: @Composable BoxScope.() -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -80,7 +81,7 @@ fun BottomSheet(
                             .roundToPx()
                             .coerceAtLeast(0)
                     IntOffset(x = 0, y = y)
-                }.bottomSheetDraggable(state, onDismiss)
+                }.bottomSheetDraggable(state, onDismiss, enabled = dragEnabled)
                 .clip(
                     RoundedCornerShape(
                         topStart = if (!state.isExpanded) 16.dp else 0.dp,
@@ -382,8 +383,10 @@ fun rememberBottomSheetState(
 fun Modifier.bottomSheetDraggable(
     state: BottomSheetState,
     onDismiss: (() -> Unit)? = null,
-): Modifier =
-    this.pointerInput(state) {
+    enabled: Boolean = true,
+): Modifier {
+    if (!enabled) return this
+    return this.pointerInput(state) {
         val velocityTracker = VelocityTracker()
 
         detectVerticalDragGestures(
@@ -403,3 +406,4 @@ fun Modifier.bottomSheetDraggable(
             },
         )
     }
+}

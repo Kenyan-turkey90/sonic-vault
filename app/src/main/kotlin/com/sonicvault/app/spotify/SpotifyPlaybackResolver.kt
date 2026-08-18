@@ -13,8 +13,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.spotify.models.SpotifyTrack

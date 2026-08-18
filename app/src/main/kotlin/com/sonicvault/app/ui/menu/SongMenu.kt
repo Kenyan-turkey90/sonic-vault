@@ -89,7 +89,9 @@ import com.sonicvault.app.db.entities.Event
 import com.sonicvault.app.db.entities.PlaylistSong
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.localmedia.Id3TagEditor
+import com.sonicvault.app.localmedia.editId3Tags
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.playback.ExoDownloadService
 import com.sonicvault.app.playback.queues.YouTubeQueue
@@ -108,6 +110,7 @@ import com.sonicvault.app.utils.SpeedDialPinType
 import com.sonicvault.app.utils.parseSpeedDialPins
 import com.sonicvault.app.utils.rememberPreference
 import com.sonicvault.app.utils.serializeSpeedDialPins
+import timber.log.Timber
 import com.sonicvault.app.utils.shareLocalAudio
 import com.sonicvault.app.utils.toggleSpeedDialPin
 import com.sonicvault.app.viewmodels.CachePlaylistViewModel
@@ -200,17 +203,19 @@ fun SongMenu(
         mutableStateOf(false)
     }
 
+    val isLocalSong = song.song.isLocal
+
     val TextFieldValueSaver: Saver<TextFieldValue, *> =
         Saver(
             save = { it.text },
             restore = { text -> TextFieldValue(text, TextRange(text.length)) },
         )
 
-    var titleField by rememberSaveable(stateSaver = TextFieldValueSaver) {
+    var titleField by rememberSaveable<TextFieldValue>(stateSaver = TextFieldValueSaver) {
         mutableStateOf(TextFieldValue(song.song.title))
     }
 
-    var artistField by rememberSaveable(stateSaver = TextFieldValueSaver) {
+    var artistField by rememberSaveable<TextFieldValue>(stateSaver = TextFieldValueSaver) {
         mutableStateOf(
             TextFieldValue(
                 song.artists
@@ -219,6 +224,18 @@ fun SongMenu(
                     .orEmpty(),
             ),
         )
+    }
+
+    var albumField by rememberSaveable<TextFieldValue>(stateSaver = TextFieldValueSaver) {
+        mutableStateOf(TextFieldValue(song.album?.title.orEmpty()))
+    }
+
+    var yearField by rememberSaveable<TextFieldValue>(stateSaver = TextFieldValueSaver) {
+        mutableStateOf(TextFieldValue(song.song.year?.toString().orEmpty()))
+    }
+
+    var trackField by rememberSaveable<TextFieldValue>(stateSaver = TextFieldValueSaver) {
+        mutableStateOf(TextFieldValue(""))
     }
 
     if (showEditDialog) {
@@ -236,19 +253,58 @@ fun SongMenu(
                 listOf(
                     stringResource(R.string.song_title) to titleField,
                     stringResource(R.string.artist_name) to artistField,
+                    stringResource(R.string.album_name) to albumField,
+                    stringResource(R.string.year) to yearField,
+                    stringResource(R.string.track_number) to trackField,
                 ),
             onTextFieldsChange = { index, newValue ->
-                if (index == 0) {
-                    titleField = newValue
-                } else {
-                    artistField = newValue
+                when (index) {
+                    0 -> titleField = newValue
+                    1 -> artistField = newValue
+                    2 -> albumField = newValue
+                    3 -> yearField = newValue
+                    4 -> trackField = newValue
                 }
             },
             onDoneMultiple = { values ->
-                val newTitle = values[0]
-                val newArtist = values[1]
+                val newTitle = values.getOrElse(0) { titleField.text }
+                val newArtist = values.getOrElse(1) { artistField.text }
+                val newAlbum = values.getOrElse(2) { albumField.text }
+                val newYear = values.getOrElse(3) { yearField.text }
+                val newTrack = values.getOrElse(4) { trackField.text }
 
-                coroutineScope.launch {
+                coroutineScope.launch(Dispatchers.IO) {
+                    if (isLocalSong) {
+                        val tagTitle: String? = if (newTitle.isBlank()) null else newTitle
+                        val tagArtist: String? = if (newArtist.isBlank()) null else newArtist
+                        val tagAlbum: String? = if (newAlbum.isBlank()) null else newAlbum
+                        val tagYear: String? = if (newYear.isBlank()) null else newYear
+                        val tagTrack: String? = if (newTrack.isBlank()) null else newTrack
+                        runCatching {
+                            editId3Tags(
+                                context = context,
+                                uri = song.id.toUri(),
+                                update =
+                                    Id3TagEditor.TagData(
+                                        title = tagTitle,
+                                        artist = tagArtist,
+                                        album = tagAlbum,
+                                        year = tagYear,
+                                        track = tagTrack,
+                                    ),
+                            )
+                        }.onSuccess {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, R.string.tags_updated, Toast.LENGTH_SHORT).show()
+                            }
+                        }.onFailure { error ->
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, R.string.tags_update_failed, Toast.LENGTH_SHORT).show()
+                            }
+                            Timber.w(error, "Failed to write ID3 tags")
+                        }
+                    }
+
                     database.query {
                         update(song.song.copy(title = newTitle))
                         val artist = song.artists.firstOrNull()
@@ -403,7 +459,6 @@ fun SongMenu(
     Spacer(modifier = Modifier.height(16.dp))
 
     val bottomSheetPageState = LocalBottomSheetPageState.current
-    val isLocalSong = song.song.isLocal
 
     val startRadioText = stringResource(R.string.start_radio)
     val playNextText = stringResource(R.string.play_next)

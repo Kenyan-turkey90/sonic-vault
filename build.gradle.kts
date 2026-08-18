@@ -5,6 +5,18 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.aboutlibraries.android) apply false
+    alias(libs.plugins.detekt) apply false
+}
+
+// Static analysis: only the rules explicitly enabled in detekt.yml run (no default ruleset).
+// Failures are reported but do not break the build yet — see the `detekt` CI job.
+subprojects {
+    plugins.withId("io.gitlab.arturbosch.detekt") {
+        extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
+            ignoreFailures = true
+            config.setFrom(rootProject.file("detekt.yml"))
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
@@ -19,6 +31,7 @@ subprojects {
     if (tasks.findByName("prepareKotlinBuildScriptModel") == null) {
         tasks.register("prepareKotlinBuildScriptModel") {}
     }
+    apply(plugin = "io.gitlab.arturbosch.detekt")
 }
 
 subprojects {

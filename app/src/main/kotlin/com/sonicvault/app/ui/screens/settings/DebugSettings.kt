@@ -190,6 +190,26 @@ fun DebugSettings(navController: NavController) {
                         onClick = { navController.navigate("settings/logcat") },
                     )
                 }
+
+                item {
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.playback_diagnostics)) },
+                        description = stringResource(R.string.playback_diagnostics_description),
+                        icon = {
+                            Icon(
+                                painter = painterResource(R.drawable.status),
+                                contentDescription = null,
+                            )
+                        },
+                        trailingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.navigate_next),
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = { navController.navigate("settings/playback_diagnostics") },
+                    )
+                }
             }
 
             AnimatedVisibility(

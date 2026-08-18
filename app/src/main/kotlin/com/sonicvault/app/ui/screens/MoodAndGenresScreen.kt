@@ -57,8 +57,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.sonicvault.app.LocalPlayerAwareWindowInsets
 import com.sonicvault.app.R
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.BrowseEndpoint
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.BrowseEndpoint
 import com.sonicvault.app.ui.component.NavigationTitle
 import com.sonicvault.app.ui.component.shimmer.ShimmerHost
 import com.sonicvault.app.ui.component.shimmer.TextPlaceholder

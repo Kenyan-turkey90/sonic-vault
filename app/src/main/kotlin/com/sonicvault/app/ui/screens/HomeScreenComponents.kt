@@ -52,6 +52,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -102,13 +104,14 @@ import com.sonicvault.app.db.entities.Playlist
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
-import moe.rukamori.archivetune.innertube.models.YTItem
-import moe.rukamori.archivetune.innertube.pages.HomePage
+import com.sonicvault.app.home.SmartMixUseCase.SmartMix
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.YTItem
+import com.sonicvault.app.innertube.pages.HomePage
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.SimilarRecommendation
 import com.sonicvault.app.models.toMediaMetadata
@@ -566,7 +569,7 @@ fun SpeedDialSection(
                                     title = localItem.title,
                                     artists =
                                         localItem.artists.map {
-                                            moe.rukamori.archivetune.innertube.models
+                                            com.sonicvault.app.innertube.models
                                                 .Artist(name = it.name, id = it.id)
                                         },
                                     thumbnail = localItem.song.thumbnailUrl.orEmpty(),
@@ -581,7 +584,7 @@ fun SpeedDialSection(
                                     title = localItem.title,
                                     artists =
                                         localItem.artists.map {
-                                            moe.rukamori.archivetune.innertube.models
+                                            com.sonicvault.app.innertube.models
                                                 .Artist(name = it.name, id = it.id)
                                         },
                                     year = localItem.album.year,
@@ -1038,6 +1041,213 @@ fun ForgottenFavoritesSection(
                                 }
                             },
                         ),
+            )
+        }
+    }
+}
+
+/**
+ * Smart Mix section - a playable, on-device mix of the user's most-played songs.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SmartMixSection(
+    smartMix: SmartMix,
+    mediaMetadata: MediaMetadata?,
+    isPlaying: Boolean,
+    navController: NavController,
+    playerConnection: PlayerConnection,
+    menuState: MenuState,
+    haptic: HapticFeedback,
+    modifier: Modifier = Modifier,
+) {
+    val distinctSongs = remember(smartMix.songs) { smartMix.songs.distinctBy { it.song.id } }
+    val queueItems = remember(distinctSongs) { distinctSongs.map { it.toMediaItem() } }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        ElevatedCard(
+            onClick = {
+                if (queueItems.isNotEmpty()) {
+                    playerConnection.playQueue(ListQueue(items = queueItems))
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            colors =
+                CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            painter = painterResource(R.drawable.graphic_eq),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                }
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = smartMix.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = smartMix.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color =
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                                alpha = 0.8f,
+                            ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Icon(
+                    painter = painterResource(R.drawable.play),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(
+                items = distinctSongs,
+                key = { it.song.id },
+                contentType = { "smart_mix_song" },
+            ) { song ->
+                SmartMixSongCard(
+                    song = song,
+                    isActive = song.song.id == mediaMetadata?.id,
+                    isPlaying = isPlaying,
+                    onClick = {
+                        playerConnection.playQueue(
+                            if (song.song.isLocal) {
+                                ListQueue(items = listOf(song.toMediaItem()))
+                            } else {
+                                YouTubeQueue.radio(song.toMediaMetadata())
+                            },
+                        )
+                    },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menuState.show {
+                            SongMenu(
+                                originalSong = song,
+                                navController = navController,
+                                onDismiss = menuState::dismiss,
+                            )
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SmartMixSongCard(
+    song: Song,
+    isActive: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor =
+                    if (isActive) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+            ),
+        modifier = modifier.width(168.dp),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+        ) {
+            AsyncImage(
+                model = song.song.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = song.song.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (isActive && isPlaying) {
+                    Icon(
+                        painter = painterResource(R.drawable.graphic_eq),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            Text(
+                text = song.artists.joinToString { it.name },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -43,8 +43,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.sonicvault.app.R
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.YTItem
 import com.sonicvault.app.ui.utils.YtimgResizePolicy
 import com.sonicvault.app.ui.utils.resize
 

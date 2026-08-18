@@ -9,10 +9,10 @@ package com.sonicvault.app.search
 
 import androidx.compose.runtime.Immutable
 import com.google.common.collect.ImmutableList
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.pages.MoodAndGenres
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.pages.MoodAndGenres
 import com.sonicvault.app.repository.SearchDiscoveryRepository
 import javax.inject.Inject
 

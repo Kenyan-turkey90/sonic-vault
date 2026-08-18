@@ -95,8 +95,8 @@ import com.sonicvault.app.constants.PreferredLyricsProvider
 import com.sonicvault.app.constants.PreloadQueueLyricsEnabledKey
 import com.sonicvault.app.constants.QueueLyricsPreloadCountKey
 import com.sonicvault.app.constants.deserializeLyricsProviderOrder
-import moe.rukamori.archivetune.paxsenix.models.PaxsenixStats
-import moe.rukamori.archivetune.paxsenix.models.ProviderStats
+import com.sonicvault.app.paxsenix.models.PaxsenixStats
+import com.sonicvault.app.paxsenix.models.ProviderStats
 import com.sonicvault.app.ui.component.ActionPromptDialog
 import com.sonicvault.app.ui.component.DefaultDialog
 import com.sonicvault.app.ui.component.EnumListPreference

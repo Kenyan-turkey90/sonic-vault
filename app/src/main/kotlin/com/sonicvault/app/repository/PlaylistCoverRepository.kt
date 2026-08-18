@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.db.entities.PlaylistEntity
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import javax.inject.Inject

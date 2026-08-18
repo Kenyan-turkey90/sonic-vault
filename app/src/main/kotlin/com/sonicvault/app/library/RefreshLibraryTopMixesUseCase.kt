@@ -25,8 +25,8 @@ import com.sonicvault.app.constants.AiProviderKey
 import com.sonicvault.app.constants.AiSelectedModelKey
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.toEnum
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.repository.LibraryTopMixRepository
@@ -334,7 +334,7 @@ private fun String.matchesComparableTitle(other: String): Boolean {
         (self == target || (self.length > 3 && target.contains(self)) || (target.length > 3 && self.contains(target)))
 }
 
-private fun List<moe.rukamori.archivetune.innertube.models.Artist>.matchesAnyLocalArtist(song: Song): Boolean {
+private fun List<com.sonicvault.app.innertube.models.Artist>.matchesAnyLocalArtist(song: Song): Boolean {
     val remoteArtists = map { it.name.normalizedForMixMatch() }.filter { it.isNotBlank() }
     val localArtists = song.artists.map { it.name.normalizedForMixMatch() }.filter { it.isNotBlank() }
     if (remoteArtists.isEmpty() || localArtists.isEmpty()) return false

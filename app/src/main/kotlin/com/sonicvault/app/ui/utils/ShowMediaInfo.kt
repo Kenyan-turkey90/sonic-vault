@@ -83,9 +83,10 @@ import coil3.compose.AsyncImage
 import com.sonicvault.app.LocalDatabase
 import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.MediaInfo
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.MediaInfo
 import com.sonicvault.app.ui.component.LocalBottomSheetPageState
+import com.sonicvault.app.utils.ReturnYouTubeDislike
 
 private enum class MediaInfoTab(
     @StringRes val labelRes: Int,
@@ -122,6 +123,7 @@ fun ShowMediaInfo(videoId: String) {
     val song by database.song(videoId).collectAsState(initial = null)
     val currentFormat by database.format(videoId).collectAsState(initial = null)
     var info by remember(videoId) { mutableStateOf<MediaInfo?>(null) }
+    var rydVotes by remember(videoId) { mutableStateOf<ReturnYouTubeDislike.Votes?>(null) }
     var selectedTab by rememberSaveable(videoId) { mutableStateOf(MediaInfoTab.Information) }
 
     val unknownText = stringResource(R.string.unknown)
@@ -148,6 +150,8 @@ fun ShowMediaInfo(videoId: String) {
 
     LaunchedEffect(videoId) {
         info = YouTube.getMediaInfo(videoId).getOrNull()
+        // Restore the public dislike count (removed by YouTube in 2021) via Return YouTube Dislike.
+        rydVotes = ReturnYouTubeDislike.fetchVotes(videoId).getOrNull()
     }
 
     val heroTitle = song?.title ?: info?.title ?: videoId
@@ -241,16 +245,29 @@ fun ShowMediaInfo(videoId: String) {
                 ?.let { add(MediaInfoQuickFact(iconRes = R.drawable.person, text = it)) }
         }
 
+    val rydDislikesText = rydVotes?.dislikes?.let(::numberFormatter)
     val metrics =
-        if (info != null) {
-            listOf(
-                MediaInfoMetric(R.string.subscribers, info?.subscribers ?: unknownText),
-                MediaInfoMetric(R.string.views, info?.viewCount?.let(::numberFormatter) ?: unknownText),
-                MediaInfoMetric(R.string.likes, info?.like?.let(::numberFormatter) ?: unknownText),
-                MediaInfoMetric(R.string.dislikes, info?.dislike?.let(::numberFormatter) ?: unknownText),
-            )
+        if (info != null || rydVotes != null) {
+            buildList {
+                add(MediaInfoMetric(R.string.subscribers, info?.subscribers ?: unknownText))
+                add(MediaInfoMetric(R.string.views, (info?.viewCount ?: rydVotes?.viewCount)?.let(::numberFormatter) ?: unknownText))
+                add(MediaInfoMetric(R.string.likes, (info?.like ?: rydVotes?.likes?.takeIf { it > 0 })?.let(::numberFormatter) ?: unknownText))
+                add(
+                    MediaInfoMetric(
+                        R.string.dislikes,
+                        (info?.dislike ?: rydVotes?.dislikes?.takeIf { it > 0 })?.let(::numberFormatter)
+                            ?: if (rydVotes != null) "0" else unknownText,
+                    ),
+                )
+            }
         } else {
             emptyList()
+        }
+    val rydSourceNote =
+        if (rydVotes != null) {
+            stringResource(R.string.ryd_source_note)
+        } else {
+            null
         }
 
     LazyColumn(
@@ -443,6 +460,14 @@ fun ShowMediaInfo(videoId: String) {
                                 )
                             } else {
                                 MediaInfoMetricsGrid(metrics = metrics)
+                                rydSourceNote?.let { note ->
+                                    Text(
+                                        text = note,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 4.dp),
+                                    )
+                                }
                             }
                         }
                     }

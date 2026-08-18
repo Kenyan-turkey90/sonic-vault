@@ -73,7 +73,7 @@ import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.extensions.isSyncEnabled
 import com.sonicvault.app.extensions.isUserLoggedIn
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.playback.ExoDownloadService
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.playback.queues.YouTubeQueue

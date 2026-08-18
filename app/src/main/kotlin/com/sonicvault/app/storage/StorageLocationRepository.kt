@@ -716,7 +716,7 @@ private fun File.ensureWritableDirectory(): Boolean =
     runCatching {
         if (exists() && !isDirectory) return@runCatching false
         if (!exists() && !mkdirs()) return@runCatching false
-        val probe = File(this, ".archivetune-storage-probe")
+        val probe = File(this, ".sonicvault-storage-probe")
         probe.writeText("ok")
         probe.delete()
     }.isSuccess

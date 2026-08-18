@@ -21,8 +21,8 @@ import com.sonicvault.app.constants.HideExplicitKey
 import com.sonicvault.app.constants.HideVideoKey
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.extensions.filterBlockedArtists
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.pages.BrowseResult
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.pages.BrowseResult
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 import com.sonicvault.app.utils.reportException

@@ -13,9 +13,10 @@ import com.google.common.collect.ImmutableList
 import com.sonicvault.app.constants.QuickPicksDisplayMode
 import com.sonicvault.app.db.entities.LocalItem
 import com.sonicvault.app.db.entities.Song
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.pages.HomePage
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.pages.HomePage
 import com.sonicvault.app.models.SimilarRecommendation
+import com.sonicvault.app.home.SmartMixUseCase.SmartMix
 
 sealed interface HomeScreenState {
     data object Loading : HomeScreenState
@@ -39,6 +40,7 @@ data class HomeUiState(
     val speedDialItems: ImmutableList<LocalItem>,
     val forgottenFavorites: ImmutableList<Song>,
     val keepListening: ImmutableList<LocalItem>,
+    val smartMix: SmartMix?,
     val similarRecommendations: ImmutableList<SimilarRecommendation>,
     val accountPlaylists: ImmutableList<PlaylistItem>,
     val homePage: HomePage?,

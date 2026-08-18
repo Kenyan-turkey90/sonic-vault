@@ -8,7 +8,7 @@
 package com.sonicvault.app.ui.menu
 
 import com.sonicvault.app.db.entities.PlaylistSongMap
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 
 suspend fun removeSongFromRemotePlaylist(
     playlistBrowseId: String,

@@ -1,0 +1,191 @@
+{
+  "agent": "r3-tidal-deezer",
+  "platforms": [
+    {
+      "name": "Tidal",
+      "howItWorks": "Subscription streaming service positioned on audio fidelity. All paid plans include lossless CD-quality FLAC (16-bit/44.1kHz) since Nov 2021; a single unified 'Tidal' plan (since Apr 2024) offers HiRes FLAC up to 24-bit/192kHz ('Max'). Formerly the HiFi Plus plan featured MQA 'Masters' (lossy, launched Jan 2017), which Tidal dropped in favor of FLAC on Jul 24, 2024; MQA and Sony 360 Reality Audio were removed, immersive is now Dolby Atmos only. Audio quality is set globally per network (Settings > Audio & Playback > Mobile data streaming / WiFi streaming / Downloads -> Low/High/Max), NOT per song. The Now Playing screen shows a live pill badge (FLAC/High/Low) reflecting the format actually delivered for that specific song, with bit-depth/sample-rate/format viewable by tapping the sound format; Max falls back HiRes FLAC -> FLAC -> AAC when a higher master is absent. Desktop offers Exclusive Mode (exclusive DAC control / bit-perfect style output). Personalization: 'My Mix' continuously-updating personalized mixes from listening history/library/favorites, plus seed-anchored radio/autoplay (track/album/artist/playlist) that circles back toward the seed's similarity.",
+      "keyFeatures": [
+        "Three quality tiers: Low (AAC up to 320kbps), High (FLAC 16-bit/44.1kHz CD quality), Max (HiRes FLAC up to 24-bit/192kHz)",
+        "Live Now Playing quality pill + tap-to-view bit-depth/sample-rate/format for the delivered stream",
+        "Per-network quality presets: Mobile data vs WiFi streaming vs Downloads set independently",
+        "Dolby Atmos immersive audio; FLAC as the open lossless backbone",
+        "Exclusive Mode on desktop (takes exclusive control of the audio device; volume handled in-app) - closest thing to a bit-perfect output toggle",
+        "My Mix: continuously-updating personalized mixes driven by listening history, library, favorites, artist affinity",
+        "Seed-anchored radio/autoplay from a track/album/artist/playlist with radio 'gravity' returning to the seed core",
+        "Data-cost framing: High ~10 MB/min, Max ~40 MB/min; recommends 1.5-2 Mbps steady"
+      ],
+      "uniqueness": [
+        "First major streamer to offer lossless streaming (2014) and MQA (2017)",
+        "Highest mainstream streaming resolution: HiRes FLAC up to 24-bit/192kHz",
+        "More transparent than Deezer: live format badge plus tap-to-view exact bit-depth/sample rate",
+        "FLAC (open, inherently gapless, bit-perfect-capable) as the lossless backbone after dropping MQA"
+      ],
+      "weaknesses": [
+        "MQA was lossy, not bit-perfect (proprietary 'origami' folding); prohibited digital output of unfolded MQA (analog DAC only); GoldenSound 2021 measurements showed not lossless; Neil Young and AIX Records pulled catalogs over 'degraded' masters",
+        "Confusing tier naming: 'Max' replaced the old HiFi/MQA/MASTER vocabulary users and screenshots still reference",
+        "The Now Playing pill collapses Max/HiRes to a generic 'FLAC' label, so a lay user cannot distinguish CD 16/44.1 from HiRes 24/192 at a glance",
+        "Quality settings are buried in Settings (global/per-network), not per-track - no 'play this track in Max' concept",
+        "Device/DAC gating: HiRes depends on DAC/device support (e.g. Chromecast falls back to High); MQA-era hardware only does native hardware unfold, software unfold is not bit-perfect",
+        "Crossfade is not a documented/exposed feature; loudness normalization toggle not surfaced in fetched docs",
+        "Recommender weighting (My Mix / radio) is opaque; echo-chamber/repetition risk; licensing gaps can make radio/mixes uneven across regions"
+      ],
+      "applicableIdeas": [
+        {
+          "idea": "Now Playing quality badge showing the actual delivered format for the current track (like Tidal's FLAC/High/Low pill), tap for details",
+          "rationale": "Sonic Vault streams YouTube audio in varying codecs/bitrates; surfacing the real stream format builds trust and echoes Tidal's transparency win. Low cost in an existing now-playing UI.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Per-network quality presets (cellular vs Wi-Fi) with data-cost framing (MB/min)",
+          "rationale": "YouTube audio is data-hungry; letting users pin lower quality on cellular (like Tidal Low/High/Max per network) reduces data surprise and matches existing player expectations.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Gapless playback via next-track prefetch + continuous PCM without flushing the output device",
+          "rationale": "FLAC is inherently gapless; Sonic Vault's YouTube streams (Opus/AAC) carry encoder delay/padding, so gapless needs decoding the next track's first blocks before the current ends and handing PCM across the boundary - Tidal/Deezer both benefit from this pipeline.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Exclusive-mode / bit-perfect toggle for local high-res FLAC files on supported DACs (bypass system resampler)",
+          "rationale": "Tidal's Exclusive Mode is a differentiator for audiophiles; Sonic Vault playing local lossless files could offer WASAPI-exclusive/ALSA-style direct output without resampling or digital volume.",
+          "effort": "P2"
+        },
+        {
+          "idea": "Seed-anchored radio 'gravity': when autoplaying from a seed track, score candidates toward seed similarity (genre/artist/sonic) with periodic novelty injection",
+          "rationale": "Tidal radio circles back to the seed core rather than drifting; gives Sonic Vault autoplay a coherent feel using similar-tracks data already available from YouTube.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Tap-to-view technical stream details (codec, bitrate, sample rate) on the now-playing screen",
+          "rationale": "Tidal exposes exact bit-depth/sample-rate; for a player that aggregates heterogeneous streams this is low-effort and high-signal transparency.",
+          "effort": "P2"
+        }
+      ]
+    },
+    {
+      "name": "Deezer",
+      "howItWorks": "French music streaming service. Audio quality is a global, per-network setting (not per-song): mobile offers 4 tiers - Basic (64kbps MP3), Standard (128kbps MP3), High quality/HQ (320kbps MP3), High Fidelity/HiFi (1411kbps FLAC 16-bit/44.1kHz). Desktop offers 3 (Standard/Better/High Fidelity). Quality is set separately for Mobile / Wi-Fi / Google Cast, plus a separate Download quality (Standard/HQ/HiFi); desktop exposes an Audio icon inside the player. HiFi is bundled into Premium/Duo/Family in most countries (standalone 'Deezer HiFi' elsewhere) and is device-gated to Desktop and select HiFi-badge devices; Deezer has NO hi-res tier (tops out at CD quality). Flow is Deezer's flagship AI endless personalized feed: driven by implicit signals (library/favorites, play counts, likes, dislikes, skips), with a documented antiskip counter that deweights heavily-skipped tracks, mood/activity filters (Chill, Party, Workout, Commute, Concentration), and a balance between core favorites and discovery. Crossfade (iOS slider) and volume normalization toggle are exposed in-app.",
+      "keyFeatures": [
+        "Four mobile quality tiers including FLAC 1411kbps 'High Fidelity' (16-bit/44.1kHz); clearer bitrate-labelled naming than Tidal",
+        "Deezer Flow: endless personalized AI feed with documented antiskip counter (deweights skipped tracks) and mood/activity filters",
+        "Per-network quality: Mobile / Wi-Fi / Google Cast set independently; separate Download quality (offline defaults to Wi-Fi-only)",
+        "Volume normalization toggle (Settings > Music > Audio preferences > Normalise volume; also via Audio icon in player)",
+        "Crossfade slider (iOS; Android via Deezer Labs beta)",
+        "HiFi badge icon on the devices page marking HiFi-capable hardware",
+        "Desktop quality picker via Audio icon inside the player"
+      ],
+      "uniqueness": [
+        "Flow with an explicit antiskip mechanism - skip-heavy content is deweighted so the feed stays on-taste",
+        "Mood/activity steering of the infinite feed (Chill/Party/Workout/Commute/Concentration) as a contextual filter on the model",
+        "In-player Audio icon as the entry point for quality + normalization, keeping audio options reachable while playing",
+        "Explicitly no hi-res: honest, unconfused positioning at CD quality (FLAC 16/44.1)"
+      ],
+      "weaknesses": [
+        "No hi-res tier at all; tops out at CD quality 16-bit/44.1kHz",
+        "HiFi is device-gated (Desktop + select TV/iOS/Android HiFi-badge devices); phone offline downloads historically dropped to 320kbps lossy",
+        "Quality is buried in Settings, not per-track; no live 'now playing 1411kbps' readout or persistent quality pill in the player - less transparent than Tidal",
+        "Flow weighting is opaque (no 'why this track'); echo-chamber risk; antiskip can near-totally suppress a track/artist once skipped heavily",
+        "HiFi not guaranteed per content (FAQ: 'Why is some of my content not available in HiFi?'); regional availability limits",
+        "Crossfade is iOS-only on stable and not applied to already-gapless FLAC (a DSP workaround, not true gapless)"
+      ],
+      "applicableIdeas": [
+        {
+          "idea": "Antiskip counter for autoplay/queue: deweight tracks you skip frequently so recommended/next-up stays on-taste",
+          "rationale": "Deezer's documented antiskip is a simple, high-value personalization win for Sonic Vault's autoplay; skip-heavy tracks naturally get demoted in future suggestions.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Volume normalization toggle (loudness-normalize across heterogeneous streams)",
+          "rationale": "YouTube sources vary wildly in loudness; Deezer exposes 'Normalise volume' prominently, and a loudness-normalized playback mode is a clear quality-of-life upgrade for an aggregator player.",
+          "effort": "P1"
+        },
+        {
+          "idea": "In-player Audio icon entry point that opens quality/normalization controls while playing",
+          "rationale": "Deezer makes audio options reachable from the player, not only Settings; keeps Sonic Vault's existing EqualizerPlaybackController surface discoverable without deep navigation.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Endless personalized feed balancing core favorites with discovery, seeded from listening history",
+          "rationale": "Flow-like generation (favorites anchor + novelty injection + antiskip) gives Sonic Vault an in-app 'mix' from local/YouTube history without needing per-track metadata richness.",
+          "effort": "P1"
+        },
+        {
+          "idea": "Mood/activity filters to steer autoplay (Chill/Party/Workout/Commute/Concentration)",
+          "rationale": "Deezer's contextual filters are low-friction and let users constrain endless playback without building a queue - a lightweight win for a player with no native catalog.",
+          "effort": "P2"
+        },
+        {
+          "idea": "Separate download quality vs streaming quality, with Wi-Fi-only-by-default offline",
+          "rationale": "Deezer separates offline quality and defaults downloads to Wi-Fi; Sonic Vault's offline/cache pipeline can mirror this to save cellular data.",
+          "effort": "P2"
+        }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "topic": "Lossless / bit-perfect + gapless pipeline",
+      "findings": [
+        "Tidal tiers: HiFi = CD-quality FLAC 16-bit/44.1kHz on all paid plans (since Nov 2021); Max = HiRes FLAC up to 24-bit/192kHz (since Apr 2024 unified plan). MQA 'Masters' launched Jan 2017, removed Jul 24, 2024 in favor of FLAC.",
+        "MQA is a proprietary lossy transport (Meridian 2014, later Lenbrook): hi-freq data folded into low-freq bands via dithering/noise-shaping; on non-MQA decoders only ~13 significant bits usable, low 3 bits play as high-frequency noise; GoldenSound 2021 measurements showed introduced HF noise/distortion; MQA Ltd prohibited digital output of unfolded MQA (analog DAC only). Classified lossy by hi-res audio wiki.",
+        "Deezer lossless: Deezer Elite (2014, FLAC 16/44.1 for Sonos) then Deezer HiFi ~36M tracks FLAC 16-bit/44.1kHz, later folded into Premium as CD-quality benefit. NO hi-res tier confirmed - Deezer tops out at CD quality.",
+        "Codecs: Tidal lossy = AAC (up to 320kbps), lossless = FLAC (16/44.1 and up to 24/192); Deezer lossy = MP3 (64/128/320kbps, AAC on some mobile), lossless = FLAC 16/44.1. FLAC is the shared open, bit-perfect-capable, inherently-gapless backbone.",
+        "Gapless mechanics: FLAC is inherently gapless (no codec padding). Lossy codecs (MP3/AAC/Opus) add encoder delay + end padding; players must decode the next track's first blocks before current ends, keep both decoded PCM fed to hardware continuously ('as if concatenated'), and trim encoder delay/padding. Crossfade is a DSP alternative that removes gaps by altering signal - discouraged for already-gapless source. Streaming gapless requires client prefetch of the following track and no output-device flush across the boundary.",
+        "Bit-perfect = delivering PCM unchanged to the DAC: match sample rate/bit depth, bypass SRC/resampling, keep volume/processing out of the digital domain. Implemented via exclusive-mode audio (WASAPI exclusive/ASIO on Windows, ALSA direct on Linux, hog mode on macOS).",
+        "MQA is fundamentally incompatible with bit-perfect (lossy + license restriction on digital output). HiRes FLAC (Tidal Max 24/192) and CD FLAC (Deezer HiFi 16/44.1) are genuinely bit-perfect-compatible with a supporting DAC + exclusive output.",
+        "Weaknesses/caveats: many 'Master'/MQA tracks were mastered from <=CD-quality sources; mobile/client software MQA 'unfold' is not bit-perfect; HiRes requires MQA-era or FLAC-native DACs; Deezer HiFi offline downloads on phones dropped to 320kbps lossy; device restrictions gate HiFi output."
+      ]
+    },
+    {
+      "topic": "Smart radio / autoplay algorithms",
+      "findings": [
+        "Deezer Flow: flagship endless personalized AI feed (current Flow tile; originated ~2016 as infinite playlist). Regenerates continuously from implicit signals - library/favorites, play counts/frequency, likes, dislikes, skips and repeat-listens.",
+        "Flow mixing: balances core favorites (feels 'like you') against discovery/novelty (less-familiar tracks); exact ratio is an opaque model parameter; plausible periodic return to the familiar core (gravity).",
+        "Deezer antiskip: CONFIRMED mechanism - model deweights tracks you skip a lot, so heavily-skipped content stops being recommended.",
+        "Flow mood/activity steering: CONFIRMED - user picks mood filters (Chill, Party, Workout, Commute, Concentration) that constrain the underlying model. Dayparting/time-of-day weighting is plausible but unconfirmed.",
+        "Tidal My Mix: continuously-updating personalized mix/playlist from listening history (frequency + library/favorites + artist affinity); historically with mood/time-blocked variants. Negative/skip signals are weaker and less documented than Deezer's antiskip.",
+        "Tidal radio/autoplay: seed-anchored - when a track/album/queue finishes, autoplay produces a related queue seeded from the current track/entity's metadata affinity (genre, artist, mood/BPM descriptors, playlist co-occurrence) resembling nearest-neighbors in a similarity space.",
+        "Radio 'gravity': queue is scored to frequently return to the seed core (same artist/genre/sonic profile) interspersed with related-but-different tracks, rather than monotonically drifting - grounded in observable behavior, not a primary Tidal doc.",
+        "General mechanics (both platforms): collaborative filtering (item-item co-occurrence), content-based audio-feature similarity (tempo/BPM, energy, valence, mode, acousticness, danceability, loudness), artist/album co-occurrence + artist affinity, and novelty injection to limit exact repeats.",
+        "Shared weaknesses: opaque per-track weighting (no 'why this track'), popularity bias, echo-chamber narrowing, and (Tidal especially) licensing-driven catalog/availability gaps that can hollow out mixes mid-session."
+      ]
+    },
+    {
+      "topic": "Audio-options & HiFi UI",
+      "findings": [
+        "Tidal quality UI: global per-network settings (Settings > Audio & Playback > Mobile data streaming / WiFi streaming / Downloads -> Low/High/Max; Desktop Settings > Streaming > Audio Quality). Takes effect from next track; offline quality applies only to future downloads (must delete & re-download to change).",
+        "Tidal quality tiers (post-July-2024): Low (AAC up to 320kbps), High (FLAC 16/44.1), Max (HiRes FLAC up to 24/192). Dolby Atmos is a separate toggle.",
+        "Tidal quality communication: Now Playing shows a pill/badge (FLAC/High/Low) below the progress bar on mobile, right of it on desktop; tapping the sound format reveals bit depth, sample rate, and format. The pill collapses Max/HiRes to generic 'FLAC' so HiRes vs CD is not visually distinct; a live 24/192 readout while streaming Max is plausible via the same tap but not explicitly documented.",
+        "Tidal Exclusive Mode: Settings > Streaming > Sound Output > More Settings - takes exclusive control of the audio device (volume controlled in-app); closest thing to a bit-perfect output toggle; Force Volume keeps app volume maxed for external control.",
+        "Deezer quality UI: global per-network (iOS Settings > Music > Choose audio quality for Mobile/Wi-Fi/Google Cast; Android Settings > Streaming quality; Desktop Audio icon inside the player); separate Download quality (Standard/HQ/HiFi) under Offline & Data; offline downloads default to Wi-Fi-only.",
+        "Deezer tiers: Basic 64kbps MP3, Standard 128kbps MP3, High Quality (HQ) 320kbps MP3, High Fidelity (HiFi) 1411kbps FLAC 16/44.1; HiFi requires >=5 Mb/s, bundled into Premium/Duo/Family in most countries.",
+        "Deezer quality communication: Audio icon in the player opens the quality/normalization menu; HiFi badge icon marks HiFi-capable devices on the devices page. No persistent 'FLAC/HiFi/1411kbps' readout on Now Playing and no live sample-rate/bitrate display in the player - less transparent than Tidal.",
+        "Per-track availability: quality is global but delivered bitstream is per-song. Tidal: pill reflects 'the formats of that specific song that have been delivered to Tidal'; Max falls back HiRes -> FLAC -> AAC; no per-tracklist MASTER/MAX badge in current UI (the historical MQA/MASTER icon left with the 2024 MQA removal). Deezer: explicit FAQ on content not available in HiFi; per-track HiFi badge/dimmed option in tracklist is undocumented.",
+        "Tidal crossfade is NOT documented/exposed; Deezer crossfade is a slider, iOS-only on stable (Android via Deezer Labs beta), set to zero to disable. Deezer volume normalization is a documented toggle in player + Settings.",
+        "Takeaway: neither platform offers per-song quality menus - quality is a global per-network setting on both, communicated in-app via badges/pills (Tidal richer, Deezer sparser)."
+      ]
+    }
+  ],
+  "sources": [
+    "https://en.wikipedia.org/wiki/Tidal_(service)",
+    "https://en.wikipedia.org/wiki/Master_Quality_Authenticated",
+    "https://en.wikipedia.org/wiki/Deezer",
+    "https://en.wikipedia.org/wiki/Gapless_playback",
+    "https://en.wikipedia.org/wiki/High-resolution_audio",
+    "https://en.wikipedia.org/wiki/Essentia",
+    "https://support.tidal.com/hc/en-us/articles/360003650917-Change-sound-quality-level",
+    "https://support.tidal.com/hc/en-us/articles/17412130162961-HiRes-FLAC-audio",
+    "https://support.tidal.com/hc/en-us/articles/25876825185425-Audio-Format-Updates",
+    "https://support.tidal.com/hc/en-us/articles/28548110049681-Exclusive-Mode",
+    "https://support.tidal.com/hc/en-us/sections/360005579037-Audio-Quality",
+    "https://support.deezer.com/hc/en-gb/articles/115003865685-Deezer-Audio-Quality",
+    "https://support.deezer.com/hc/en-gb/articles/115004588345-High-Fidelity-HiFi-on-Deezer",
+    "https://support.deezer.com/hc/en-gb/articles/360005369938-Volume-Normalization-on-Deezer",
+    "https://support.deezer.com/hc/en-gb/articles/115003862085-Deezer-Crossfade",
+    "https://support.deezer.com/hc/en-gb/articles/115003884605-Listen-To-Deezer-Offline",
+    "https://deezer.io/ (Deezer engineering blog - Flow/personalization)",
+    "https://dl.acm.org/doi/10.1145/3109859.3109911 (Harvey 2017, 'Modeling skip behaviour in music recommendation', RecSys 2017)"
+  ],
+  "status": "done",
+  "notes": "Methodology: 3 sub-agents spawned strictly sequentially (lossless/bit-perfect+gapless -> smart radio/autoplay -> audio-options & HiFi UI). Sub-agents reported that WebSearch/WebFetch were unreliable/blocked (empty stubs, backend model errors, 403 from tidal.com, Cloudflare on Tidal), so they fell back to direct fetching of Wikipedia, official Tidal/Deezer help-center articles (via r.jina.ai text proxy), and established knowledge - inference is explicitly flagged per finding. Specific recommender coefficients (Flow weights, dayparting) are not publicly disclosed by either platform and are marked as inference. No source files under app/ or core/ were modified; this journal file is the only write."
+}

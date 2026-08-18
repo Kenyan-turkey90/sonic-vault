@@ -17,8 +17,8 @@ import com.sonicvault.app.constants.YtmSyncKey
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.db.entities.PlaylistEntity
 import com.sonicvault.app.extensions.isInternetConnected
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.utils.hasYouTubeLoginCookie
 import com.sonicvault.app.utils.dataStore
 import java.time.LocalDateTime
 import javax.inject.Inject

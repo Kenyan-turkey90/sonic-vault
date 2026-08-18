@@ -96,8 +96,8 @@ import com.sonicvault.app.constants.PureBlackKey
 import com.sonicvault.app.db.entities.Playlist
 import com.sonicvault.app.extensions.move
 import com.sonicvault.app.extensions.toMediaItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.ui.component.CreatePlaylistDialog
 import com.sonicvault.app.ui.component.ExpressivePullToRefreshBox

@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 import com.sonicvault.app.LocalPlayerAwareWindowInsets
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.*
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.ui.component.*
 import com.sonicvault.app.ui.utils.backToMain
 import com.sonicvault.app.utils.ProxyUtils

@@ -9,7 +9,7 @@ package com.sonicvault.app.lyrics
 
 import android.content.Context
 import com.sonicvault.app.constants.EnableLrcLibKey
-import moe.rukamori.archivetune.lrclib.LrcLib
+import com.sonicvault.app.lrclib.LrcLib
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 

@@ -9,7 +9,7 @@ package com.sonicvault.app.lyrics
 
 import android.content.Context
 import android.util.Log
-import moe.rukamori.archivetune.betterlyrics.BetterLyrics
+import com.sonicvault.app.betterlyrics.BetterLyrics
 import com.sonicvault.app.constants.EnableBetterLyricsKey
 import com.sonicvault.app.utils.GlobalLog
 import com.sonicvault.app.utils.dataStore

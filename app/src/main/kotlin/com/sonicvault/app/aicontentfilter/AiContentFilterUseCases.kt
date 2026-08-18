@@ -9,12 +9,12 @@ package com.sonicvault.app.aicontentfilter
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.Artist
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
-import moe.rukamori.archivetune.innertube.models.SongItem
-import moe.rukamori.archivetune.innertube.models.YTItem
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.Artist
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.SongItem
+import com.sonicvault.app.innertube.models.YTItem
 import javax.inject.Inject
 
 class ObserveAiContentFilterUseCase

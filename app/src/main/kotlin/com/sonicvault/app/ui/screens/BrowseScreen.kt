@@ -31,9 +31,9 @@ import com.sonicvault.app.LocalPlayerAwareWindowInsets
 import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.GridThumbnailHeight
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.ArtistItem
-import moe.rukamori.archivetune.innertube.models.PlaylistItem
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.ArtistItem
+import com.sonicvault.app.innertube.models.PlaylistItem
 import com.sonicvault.app.ui.component.IconButton
 import com.sonicvault.app.ui.component.LocalMenuState
 import com.sonicvault.app.ui.component.YouTubeGridItem

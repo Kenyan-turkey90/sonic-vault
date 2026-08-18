@@ -7,7 +7,7 @@
 
 package com.sonicvault.app.extensions
 
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.models.MediaMetadata
 import com.sonicvault.app.models.PersistQueue
 import com.sonicvault.app.models.QueueData

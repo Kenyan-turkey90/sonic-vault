@@ -8,7 +8,7 @@
 package com.sonicvault.app.lyrics
 
 import android.content.Context
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 
 object YouTubeSubtitleLyricsProvider : LyricsProvider {
     override val name = "YouTube Subtitle"

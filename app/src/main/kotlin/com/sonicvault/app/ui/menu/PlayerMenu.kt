@@ -50,6 +50,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -90,6 +91,7 @@ import com.sonicvault.app.LocalDownloadUtil
 import com.sonicvault.app.LocalPlayerConnection
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.SonicVaultCanvasKey
+import com.sonicvault.app.constants.AudioNormalizationKey
 import com.sonicvault.app.constants.ArtistSeparatorsKey
 import com.sonicvault.app.constants.ExternalDownloaderEnabledKey
 import com.sonicvault.app.constants.ExternalDownloaderPackageKey
@@ -158,7 +160,9 @@ fun PlayerMenu(
     val (artistSeparators) = rememberPreference(ArtistSeparatorsKey, defaultValue = ",;/&")
     val (externalDownloaderEnabled) = rememberPreference(ExternalDownloaderEnabledKey, defaultValue = false)
     val (externalDownloaderPackage) = rememberPreference(ExternalDownloaderPackageKey, defaultValue = "")
-    val (archiveTuneCanvasEnabled) = rememberPreference(SonicVaultCanvasKey, defaultValue = false)
+    val (sonicVaultCanvasEnabled) = rememberPreference(SonicVaultCanvasKey, defaultValue = false)
+    val (audioNormalization, onAudioNormalizationChange) =
+        rememberPreference(AudioNormalizationKey, defaultValue = true)
     val playerDesignStyle by rememberEnumPreference(PlayerDesignStyleKey, defaultValue = PlayerDesignStyle.V4)
     val lowDataModeActive = rememberLowDataModeActive()
     val isCanvasArtworkRefetching by playerConnection.isCanvasArtworkRefetching.collectAsStateWithLifecycle()
@@ -455,7 +459,7 @@ fun PlayerMenu(
                             if (
                                 !isLocalMedia &&
                                 isQueueTrigger != true &&
-                                archiveTuneCanvasEnabled &&
+                                sonicVaultCanvasEnabled &&
                                 !lowDataModeActive &&
                                 playerDesignStyle != PlayerDesignStyle.V5
                             ) {
@@ -921,6 +925,36 @@ fun PlayerMenu(
                                 )
                             },
                             modifier = Modifier.clickable { showPitchTempoDialog = true },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.audio_normalization)) },
+                            leadingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.volume_up),
+                                    contentDescription = null,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = stringResource(R.string.audio_normalization_player_description),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = audioNormalization,
+                                    onCheckedChange = onAudioNormalizationChange,
+                                )
+                            },
+                            modifier = Modifier.clickable { onAudioNormalizationChange(!audioNormalization) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         )
                     }

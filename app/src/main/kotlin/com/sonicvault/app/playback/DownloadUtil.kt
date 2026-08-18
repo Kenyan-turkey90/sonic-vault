@@ -34,16 +34,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import com.sonicvault.app.constants.AudioQuality
 import com.sonicvault.app.constants.AudioQualityKey
+import com.sonicvault.app.constants.CellularAudioQualityKey
+import com.sonicvault.app.constants.PerNetworkQualityKey
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.db.entities.FormatEntity
 import com.sonicvault.app.db.entities.SongEntity
 import com.sonicvault.app.di.DownloadCache
 import com.sonicvault.app.di.PlayerCache
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.utils.AuthScopedCacheValue
 import com.sonicvault.app.utils.StreamClientUtils
 import com.sonicvault.app.utils.YTPlayerUtils
 import com.sonicvault.app.utils.enumPreference
+import com.sonicvault.app.utils.preference
 import com.sonicvault.app.utils.isLowDataModeActive
 import com.sonicvault.app.utils.retryWithoutPlaybackLoginContext
 import okhttp3.ConnectionPool
@@ -67,6 +70,8 @@ class DownloadUtil
     ) {
         private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
         private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
+        private val perNetworkQuality by preference(context, PerNetworkQualityKey, false)
+        private val cellularAudioQuality by enumPreference(context, CellularAudioQualityKey, AudioQuality.HIGH)
         private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private val songUrlCache = ConcurrentHashMap<String, AuthScopedCacheValue>()
         private val downloadExecutor = Executors.newFixedThreadPool(DEFAULT_MAX_PARALLEL_DOWNLOADS)
@@ -233,7 +238,11 @@ class DownloadUtil
         fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }
 
         private fun resolveDownloadAudioQuality(lowDataModeActive: Boolean): AudioQuality =
-            if (lowDataModeActive) AudioQuality.LOW else audioQuality
+            if (lowDataModeActive) {
+                if (perNetworkQuality) cellularAudioQuality else AudioQuality.LOW
+            } else {
+                audioQuality
+            }
 
         private fun buildSongUrlCacheKey(
             mediaId: String,

@@ -26,7 +26,7 @@ import com.sonicvault.app.db.entities.Artist
 import com.sonicvault.app.db.entities.ListeningTotals
 import com.sonicvault.app.db.entities.Song
 import com.sonicvault.app.db.entities.SongWithStats
-import moe.rukamori.archivetune.innertube.YouTube
+import com.sonicvault.app.innertube.YouTube
 import com.sonicvault.app.utils.reportException
 import java.time.Duration
 import java.time.LocalDateTime

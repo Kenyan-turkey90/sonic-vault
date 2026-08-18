@@ -26,8 +26,8 @@ import com.sonicvault.app.cipher.CipherSettingsDomainState
 import com.sonicvault.app.cipher.ManualCipherRefreshResult
 import com.sonicvault.app.cipher.ObserveCipherSettingsUseCase
 import com.sonicvault.app.cipher.RefreshCipherUseCase
-import moe.rukamori.archivetune.morideobfuscator.CipherRuntimeStatus
-import moe.rukamori.archivetune.morideobfuscator.MORI_CIPHER_REFRESH_INTERVAL_MILLIS
+import com.sonicvault.app.morideobfuscator.CipherRuntimeStatus
+import com.sonicvault.app.morideobfuscator.MORI_CIPHER_REFRESH_INTERVAL_MILLIS
 import com.sonicvault.app.utils.reportException
 import java.util.Locale
 import javax.inject.Inject

@@ -17,25 +17,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.sonicvault.app.constants.AudioQuality
 import com.sonicvault.app.constants.PlayerStreamClient
-import moe.rukamori.archivetune.innertube.NewPipeUtils
-import moe.rukamori.archivetune.innertube.PlaybackAuthState
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.YouTubeClient
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.ANDROID_CREATOR
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.ANDROID_MUSIC
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.ANDROID_TESTSUITE
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.ANDROID_UNPLUGGED
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.IOS
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.IOS_MUSIC
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.IPADOS
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.MOBILE
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.TVHTML5
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.TVHTML5_SIMPLY_EMBEDDED_PLAYER
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.VISIONOS
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.WEB
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.WEB_CREATOR
-import moe.rukamori.archivetune.innertube.models.YouTubeClient.Companion.WEB_REMIX
-import moe.rukamori.archivetune.innertube.models.response.PlayerResponse
+import com.sonicvault.app.innertube.NewPipeUtils
+import com.sonicvault.app.innertube.PlaybackAuthState
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.YouTubeClient
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.ANDROID_CREATOR
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.ANDROID_MUSIC
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.ANDROID_TESTSUITE
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.ANDROID_UNPLUGGED
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.IOS
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.IOS_MUSIC
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.IPADOS
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.MOBILE
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.TVHTML5
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.TVHTML5_SIMPLY_EMBEDDED_PLAYER
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.VISIONOS
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.WEB
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.WEB_CREATOR
+import com.sonicvault.app.innertube.models.YouTubeClient.Companion.WEB_REMIX
+import com.sonicvault.app.innertube.models.response.PlayerResponse
 import com.sonicvault.app.utils.potoken.BotGuardTokenGenerator
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import timber.log.Timber
@@ -114,7 +114,7 @@ object YTPlayerUtils {
      * Do not use other clients for this because it can result in inconsistent metadata.
      * For example other clients can have different normalization targets (loudnessDb).
      *
-     * [moe.rukamori.archivetune.innertube.models.YouTubeClient.WEB_REMIX] should be preferred here because currently it is the only client which provides:
+     * [com.sonicvault.app.innertube.models.YouTubeClient.WEB_REMIX] should be preferred here because currently it is the only client which provides:
      * - the correct metadata (like loudnessDb)
      * - premium formats
      */
@@ -165,11 +165,58 @@ object YTPlayerUtils {
     private val playbackDataResolutionMutexes = Array(PLAYBACK_DATA_RESOLUTION_MUTEX_COUNT) { Mutex() }
     private val failedStreamClientsUntil = ConcurrentHashMap<String, Long>()
 
+    /**
+     * Caches raw player responses (metadata + stream clients) per videoId+client so a
+     * "play as video" resolution can reuse the response the audio session already fetched
+     * instead of issuing a second (often slow) youtubei/v1/player request.
+     */
+    private class CachedPlayerResponse(
+        val response: PlayerResponse,
+        val cachedAtMs: Long,
+        val authFingerprint: String,
+    ) {
+        fun isValid(fingerprint: String, nowMs: Long = System.currentTimeMillis()): Boolean =
+            this.authFingerprint == fingerprint && nowMs - cachedAtMs < PLAYER_RESPONSE_CACHE_TTL_MS
+    }
+
+    private val playerResponseCache = ConcurrentHashMap<String, CachedPlayerResponse>()
+    private val PLAYER_RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000L
+
+    private fun playerResponseCacheKey(
+        videoId: String,
+        client: YouTubeClient,
+        authFingerprint: String,
+    ): String = "$videoId|${client.clientName}@${client.clientVersion}|$authFingerprint"
+
+    private fun getCachedPlayerResponse(
+        videoId: String,
+        client: YouTubeClient,
+        authFingerprint: String,
+    ): PlayerResponse? =
+        playerResponseCache[playerResponseCacheKey(videoId, client, authFingerprint)]
+            ?.takeIf { it.isValid(authFingerprint) }
+            ?.response
+
+    private fun cachePlayerResponse(
+        videoId: String,
+        client: YouTubeClient,
+        authFingerprint: String,
+        response: PlayerResponse,
+    ) {
+        if (playerResponseCache.size > MAX_PLAYBACK_DATA_CACHE_ENTRIES) {
+            val oldest = playerResponseCache.entries.minByOrNull { it.value.cachedAtMs } ?: return
+            playerResponseCache.remove(oldest.key)
+        }
+        playerResponseCache[playerResponseCacheKey(videoId, client, authFingerprint)] =
+            CachedPlayerResponse(response, System.currentTimeMillis(), authFingerprint)
+    }
+
     @Volatile private var lastSuccessfulClientKey: String? = null
 
     fun clearPlaybackAuthCaches() {
         streamUrlCache.clear()
         playbackDataCache.clear()
+        playerResponseCache.clear()
         failedStreamClientsUntil.clear()
         lastSuccessfulClientKey = null
     }
@@ -368,7 +415,7 @@ object YTPlayerUtils {
                 WEB_REMIX
             }
 
-            PlayerStreamClient.ARCHIVETUNE_EXTRACTOR -> {
+            PlayerStreamClient.SONICVAULT_EXTRACTOR -> {
                 if (authState.hasPlaybackLoginContext) ANDROID_MUSIC else WEB_REMIX
             }
 
@@ -438,17 +485,36 @@ object YTPlayerUtils {
         if (!video) return base
 
         val videoPriority =
-            arrayOf(
-                WEB_REMIX,
-                MOBILE,
-                IOS,
-                IOS_MUSIC,
-                ANDROID_MUSIC,
-                WEB,
-                TVHTML5,
-                WEB_CREATOR,
-                TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-            )
+            if (authState.hasPlaybackLoginContext) {
+                // Logged in: combined WEB_REMIX streams work and cost no extra request.
+                arrayOf(
+                    WEB_REMIX,
+                    MOBILE,
+                    IOS,
+                    IOS_MUSIC,
+                    ANDROID_MUSIC,
+                    WEB,
+                    TVHTML5,
+                    WEB_CREATOR,
+                    TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                )
+            } else {
+                // Guests: native/mobile clients return direct, unciphered stream URLs that play
+                // without sign-in (NewPipe-style). WEB_REMIX combined streams are gated for guest
+                // accounts and 403, so push the native direct-URL clients ahead of it.
+                arrayOf(
+                    IOS,
+                    IOS_MUSIC,
+                    MOBILE,
+                    ANDROID_MUSIC,
+                    IPADOS,
+                    WEB_REMIX,
+                    WEB,
+                    TVHTML5,
+                    WEB_CREATOR,
+                    TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                )
+            }
         return buildList {
             addAll(videoPriority.filter { it in base })
             addAll(base.filterNot { it in videoPriority })
@@ -463,6 +529,13 @@ object YTPlayerUtils {
         val streamUrl: String,
         val streamExpiresInSeconds: Int,
         val authFingerprint: String,
+        /**
+         * In "play as video" mode, when only a video-only adaptive format is available (no
+         * combined audio+video stream), the audio track is served from a separate audio-only
+         * stream. The service merges both via MergingMediaSource. Null when the resolved
+         * stream already carries audio.
+         */
+        val companionAudioStreamUrl: String? = null,
     )
 
     /**
@@ -523,77 +596,6 @@ object YTPlayerUtils {
                 if (failure is CancellationException) throw failure
             }
         }
-    }
-
-    /**
-     * Resolves a video-only adaptive stream URL for a track — the video track used in merged
-     * Song/Video playback. Returns failure if the track has no playable video stream.
-     */
-    data class VideoPlaybackResult(
-        val url: String,
-        val combined: Boolean,
-    )
-
-    suspend fun videoOnlyPlaybackUrl(
-        videoId: String,
-        connectivityManager: ConnectivityManager,
-        preferredStreamClient: PlayerStreamClient = PlayerStreamClient.WEB_REMIX,
-    ): Result<VideoPlaybackResult> =
-        playerResponseForPlayback(
-            videoId = videoId,
-            audioQuality = AudioQuality.HIGH,
-            connectivityManager = connectivityManager,
-            preferredStreamClient = preferredStreamClient,
-            video = true,
-        ).map { playback ->
-            VideoPlaybackResult(
-                url = playback.streamUrl,
-                combined = playback.format.mimeType.hasEmbeddedAudioCodec(),
-            )
-        }
-
-    private fun String.hasEmbeddedAudioCodec(): Boolean {
-        // A combined/progressive format (itag 18/22) lists BOTH a video and an audio codec in the
-        // `codecs="..."` attribute; a video-only adaptive format lists only the video codec. Parse
-        // the codec list properly instead of substring-sniffing so a video-only codec string can't
-        // be misclassified as "combined".
-        val codecs =
-            Regex("""codecs="([^"]+)"""")
-                .find(this)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?.split(",")
-                ?.map { it.trim().lowercase(Locale.US) }
-                .orEmpty()
-        if (codecs.isEmpty()) {
-            // Fallback for responses without a codecs attribute: detect an embedded audio container.
-            return contains("mp4a", ignoreCase = true) ||
-                contains("opus", ignoreCase = true) ||
-                contains("ac-3", ignoreCase = true) ||
-                contains("mp3", ignoreCase = true)
-        }
-        val hasVideo =
-            codecs.any {
-                it.startsWith("avc1") ||
-                    it.startsWith("hvc1") ||
-                    it.startsWith("hev1") ||
-                    it.startsWith("av01") ||
-                    it.startsWith("vp8") ||
-                    it.startsWith("vp9")
-            }
-        val hasAudio =
-            codecs.any {
-                it.startsWith("mp4a") ||
-                    it.startsWith("opus") ||
-                    it.startsWith("ac-3") ||
-                    it.startsWith("ec-3") ||
-                    it == "mp3" ||
-                    it == "flac" ||
-                    it.startsWith("silk") ||
-                    it == "vorbis" ||
-                    it == ".mp3"
-            }
-        return hasVideo && hasAudio
     }
 
     private suspend fun resolvePlaybackData(
@@ -838,16 +840,25 @@ object YTPlayerUtils {
             }
         }
 
+        val preAuthFingerprint = authState.fingerprint
         var metadataResult =
-            YouTube.player(
-                videoId = videoId,
-                playlistId = playlistId,
-                client = metadataClient,
-                signatureTimestamp = signatureTimestamp,
-                poToken = metadataPoToken,
-                setLogin = true,
-                authState = authState,
-            )
+            getCachedPlayerResponse(videoId, metadataClient, preAuthFingerprint)?.let { cachedResponse ->
+                Timber.tag(logTag).i("Reusing cached player response for %s (metadata)", videoId)
+                Result.success(cachedResponse)
+            } ?: YouTube
+                .player(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    client = metadataClient,
+                    signatureTimestamp = signatureTimestamp,
+                    poToken = metadataPoToken,
+                    setLogin = true,
+                    authState = authState,
+                ).also { result ->
+                    result.getOrNull()?.let { response ->
+                        cachePlayerResponse(videoId, metadataClient, preAuthFingerprint, response)
+                    }
+                }
         val metadataFailure = metadataResult.exceptionOrNull()
         if (metadataFailure != null && canUseLoggedInPlayback && metadataFailure.isInvalidPlaybackLoginContextFailure()) {
             Timber.tag(logTag).w(
@@ -918,6 +929,7 @@ object YTPlayerUtils {
 
         val botDetectedClients = mutableSetOf<String>()
         var gateFailure: PlaybackGateFailure? = null
+        var companionAudioUrl: String? = null
 
         fun shouldUseCookieAuthentication(client: YouTubeClient): Boolean = canUseLoggedInPlayback && client.supportsCookieAuthentication
 
@@ -931,6 +943,7 @@ object YTPlayerUtils {
             streamClientUsed = null
             streamExpiresInSeconds = null
             streamPlayerResponse = null
+            companionAudioUrl = null
 
             Timber.tag(logTag).v(
                 "Trying ${if (client == MAIN_CLIENT) "MAIN_CLIENT" else "fallback client"} ${index + 1}/${streamClients.size}: ${describeClient(
@@ -949,16 +962,27 @@ object YTPlayerUtils {
                 if (client == metadataClient) {
                     metadataPlayerResponse
                 } else {
-                    Timber.tag(logTag).i("Fetching player response for fallback client: ${describeClient(client)}")
-                    YouTube
-                        .player(
-                            videoId = videoId,
-                            playlistId = playlistId,
-                            client = client,
-                            signatureTimestamp = signatureTimestamp,
-                            setLogin = requestUsesCookieAuthentication,
-                            authState = authState,
-                        ).getPlaybackPlayerResponseOrNull(videoId, authState)
+                    val clientAuthFingerprint = authState.fingerprint
+                    val cachedStreamResponse =
+                        getCachedPlayerResponse(videoId, client, clientAuthFingerprint)
+                    if (cachedStreamResponse != null) {
+                        Timber.tag(logTag).i("Reusing cached player response for %s (client %s)", videoId, describeClient(client))
+                        cachedStreamResponse
+                    } else {
+                        Timber.tag(logTag).i("Fetching player response for fallback client: ${describeClient(client)}")
+                        YouTube
+                            .player(
+                                videoId = videoId,
+                                playlistId = playlistId,
+                                client = client,
+                                signatureTimestamp = signatureTimestamp,
+                                setLogin = requestUsesCookieAuthentication,
+                                authState = authState,
+                            ).getPlaybackPlayerResponseOrNull(videoId, authState)
+                            ?.also { response ->
+                                cachePlayerResponse(videoId, client, clientAuthFingerprint, response)
+                            }
+                    }
                 }
 
             if (streamPlayerResponse == null) continue
@@ -1115,7 +1139,15 @@ object YTPlayerUtils {
                     streamPlayerResponse.streamingData?.adaptiveFormats?.size ?: 0,
                     streamPlayerResponse.playabilityStatus.status,
                 )
-                candidates = (combined + videoOnly).distinctBy { it.itag }
+                // Prefer DIRECT video-only adaptive formats (served with the same direct-URL
+                // mechanism as audio, no JS decipher needed): the service merges them with an
+                // audio companion. Ciphered combined streams are a last resort because broken
+                // JS decipher signatures surface as hard HTTP 403s on some devices.
+                val directVideoOnly = videoOnly.filter { it.url != null }
+                val directCombined = combined.filter { it.url != null }
+                candidates =
+                    (directVideoOnly + directCombined + videoOnly.filterNot { it.url != null })
+                        .distinctBy { it.itag }
             } else {
                 candidates = selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
             }
@@ -1176,6 +1208,21 @@ object YTPlayerUtils {
             format = selectedFormat
             streamUrl = selectedUrl
             streamClientUsed = client
+            if (video && !selectedFormat.mimeType.contains("audio", ignoreCase = true)) {
+                // Video-only format: find an audio-only companion in the same response so the
+                // service can merge both streams (MergingMediaSource) and keep sound playing.
+                val audioCompanion =
+                    selectAudioFormatCandidates(streamPlayerResponse, audioQuality, isMetered)
+                        .firstNotNullOfOrNull { audioCandidate ->
+                            runCatching {
+                                findUrl(audioCandidate, videoId, client, authState).getOrThrow()
+                            }.getOrNull()
+                        }
+                if (audioCompanion != null) {
+                    Timber.tag(logTag).i("Video-only stream for $videoId; resolved audio companion")
+                }
+                companionAudioUrl = audioCompanion
+            }
             streamExpiresInSeconds =
                 resolveExpireSeconds(
                     apiExpire = streamPlayerResponse.streamingData?.expiresInSeconds,
@@ -1272,6 +1319,7 @@ object YTPlayerUtils {
             streamUrl,
             streamExpiresInSeconds,
             authState.fingerprint,
+            companionAudioUrl,
         )
     }
 

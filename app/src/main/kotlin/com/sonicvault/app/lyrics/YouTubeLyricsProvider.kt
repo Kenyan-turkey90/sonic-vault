@@ -8,8 +8,8 @@
 package com.sonicvault.app.lyrics
 
 import android.content.Context
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.WatchEndpoint
 
 object YouTubeLyricsProvider : LyricsProvider {
     override val name = "YouTube Music"

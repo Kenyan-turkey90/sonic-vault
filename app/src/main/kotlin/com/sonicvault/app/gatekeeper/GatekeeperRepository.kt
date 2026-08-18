@@ -6,7 +6,7 @@
 
 package com.sonicvault.app.gatekeeper
 
-import moe.rukamori.archivetune.innertube.NetworkGatekeeper
+import com.sonicvault.app.innertube.NetworkGatekeeper
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,7 +21,7 @@ sealed interface GatekeeperResult {
 
 /**
  * Sonic Vault is fully self-contained — there is no external remote to verify against, so
- * network access is always allowed. The base ArchiveTune gatekeeper gated every request
+ * network access is always allowed. The base SonicVault gatekeeper gated every request
  * behind the upstream author's private server plus a bearer token, which would otherwise
  * block all playback, search, and discovery on a rebranded build.
  */

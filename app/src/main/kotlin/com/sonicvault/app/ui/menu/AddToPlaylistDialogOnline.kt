@@ -54,8 +54,8 @@ import com.sonicvault.app.R
 import com.sonicvault.app.constants.ListThumbnailSize
 import com.sonicvault.app.db.entities.Playlist
 import com.sonicvault.app.db.entities.Song
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.SongItem
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.SongItem
 import com.sonicvault.app.models.toMediaMetadata
 import com.sonicvault.app.ui.component.CreatePlaylistDialog
 import com.sonicvault.app.ui.component.DefaultDialog

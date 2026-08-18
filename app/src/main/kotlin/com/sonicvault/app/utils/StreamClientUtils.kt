@@ -7,7 +7,7 @@
 
 package com.sonicvault.app.utils
 
-import moe.rukamori.archivetune.innertube.models.YouTubeClient
+import com.sonicvault.app.innertube.models.YouTubeClient
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request

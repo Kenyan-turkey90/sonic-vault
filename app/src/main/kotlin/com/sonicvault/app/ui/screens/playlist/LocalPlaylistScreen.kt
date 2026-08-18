@@ -98,8 +98,8 @@ import com.sonicvault.app.db.entities.PlaylistSong
 import com.sonicvault.app.extensions.move
 import com.sonicvault.app.extensions.toMediaItem
 import com.sonicvault.app.extensions.togglePlayPause
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.WatchEndpoint
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.WatchEndpoint
 import com.sonicvault.app.playback.queues.ListQueue
 import com.sonicvault.app.playback.queues.LocalMixQueue
 import com.sonicvault.app.playback.queues.YouTubeQueue

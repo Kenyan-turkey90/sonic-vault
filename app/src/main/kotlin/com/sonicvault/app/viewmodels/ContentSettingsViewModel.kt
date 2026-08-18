@@ -32,8 +32,8 @@ import com.sonicvault.app.aicontentfilter.RefreshAiContentFilterUseCase
 import com.sonicvault.app.aicontentfilter.UpdateAiContentFilterSettingsUseCase
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.lyrics.LyricsHelper
-import moe.rukamori.archivetune.paxsenix.PaxsenixLyrics
-import moe.rukamori.archivetune.paxsenix.models.PaxsenixStats
+import com.sonicvault.app.paxsenix.PaxsenixLyrics
+import com.sonicvault.app.paxsenix.models.PaxsenixStats
 import javax.inject.Inject
 
 sealed interface PaxsenixStatsState {

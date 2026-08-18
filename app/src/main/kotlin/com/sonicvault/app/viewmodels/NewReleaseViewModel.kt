@@ -24,11 +24,11 @@ import com.sonicvault.app.constants.HideExplicitKey
 import com.sonicvault.app.constants.HideVideoKey
 import com.sonicvault.app.db.MusicDatabase
 import com.sonicvault.app.extensions.filterBlockedArtists
-import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.models.AlbumItem
-import moe.rukamori.archivetune.innertube.models.AlbumReleaseType
-import moe.rukamori.archivetune.innertube.models.filterExplicit
-import moe.rukamori.archivetune.innertube.models.filterVideo
+import com.sonicvault.app.innertube.YouTube
+import com.sonicvault.app.innertube.models.AlbumItem
+import com.sonicvault.app.innertube.models.AlbumReleaseType
+import com.sonicvault.app.innertube.models.filterExplicit
+import com.sonicvault.app.innertube.models.filterVideo
 import com.sonicvault.app.utils.dataStore
 import com.sonicvault.app.utils.get
 import com.sonicvault.app.utils.reportException
