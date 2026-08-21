@@ -150,6 +150,7 @@ class App :
         CanvasArtworkPlaybackCache.init(this)
         SonicVaultCanvas.initialize(BuildConfig.CANVAS_BEARER_TOKEN)
         PaxsenixLyrics.setUserAgent("SonicVault", BuildConfig.VERSION_NAME)
+        YouTube.transcriptApiKey = BuildConfig.YOUTUBE_TRANSCRIPT_KEY
 
         val locale = Locale.getDefault()
         val languageTag = locale.toLanguageTag().replace("-Hant", "")

@@ -44,6 +44,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.Image
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
@@ -391,7 +392,7 @@ private fun SunnyIdentityPanel(
             shadowElevation = 1.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
+                Image(
                     painter = painterResource(iconResId),
                     contentDescription = null,
                     modifier = Modifier.size(150.dp),

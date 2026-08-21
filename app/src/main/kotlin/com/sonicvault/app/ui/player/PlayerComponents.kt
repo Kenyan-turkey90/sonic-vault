@@ -64,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,6 +81,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -102,6 +105,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import me.saket.squiggles.SquigglySlider
+import com.sonicvault.app.LocalDatabase
+import com.sonicvault.app.LocalDownloadUtil
 import com.sonicvault.app.R
 import com.sonicvault.app.constants.EnableHapticFeedbackKey
 import com.sonicvault.app.constants.PlayerBackgroundStyle
@@ -115,6 +120,7 @@ import com.sonicvault.app.db.entities.formattedSampleRate
 import com.sonicvault.app.extensions.togglePlayPause
 import com.sonicvault.app.extensions.toggleRepeatMode
 import com.sonicvault.app.models.MediaMetadata
+import com.sonicvault.app.playback.ExoDownloadService
 import com.sonicvault.app.playback.PlayerConnection
 import com.sonicvault.app.ui.component.BottomSheetPageState
 import com.sonicvault.app.ui.component.BottomSheetState
@@ -126,6 +132,11 @@ import com.sonicvault.app.ui.theme.PlayerBackgroundColorUtils
 import com.sonicvault.app.ui.theme.PlayerSliderColors
 import com.sonicvault.app.ui.utils.ShowMediaInfo
 import com.sonicvault.app.ui.utils.highRes
+import com.sonicvault.app.utils.rememberPreference
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.offline.DownloadService
+import androidx.core.net.toUri
 import com.sonicvault.app.utils.makeTimeString
 import com.sonicvault.app.utils.rememberLowDataModeActive
 import com.sonicvault.app.utils.rememberPreference
@@ -888,6 +899,97 @@ fun PlayerTimeLabel(
 }
 
 @Composable
+fun PlayerDownloadButton(
+    mediaMetadata: MediaMetadata?,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = CircleShape,
+    containerColor: Color? = null,
+    iconSize: Dp = 22.dp,
+    iconTint: Color,
+) {
+    if (mediaMetadata == null) return
+    val context = LocalContext.current
+    val database = LocalDatabase.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
+    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id).collectAsState(initial = null)
+    val downloadState = download?.state
+
+    Box(
+        modifier =
+            modifier
+                .clip(shape)
+                .then(if (containerColor != null) Modifier.background(containerColor) else Modifier)
+                .clickable {
+                    if (enableHapticFeedback) {
+                        view.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.CONTEXT_CLICK,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
+                        )
+                    }
+                    when (downloadState) {
+                        Download.STATE_QUEUED,
+                        Download.STATE_DOWNLOADING,
+                        Download.STATE_COMPLETED -> {
+                            DownloadService.sendRemoveDownload(
+                                context,
+                                ExoDownloadService::class.java,
+                                mediaMetadata.id,
+                                false,
+                            )
+                        }
+
+                        else -> {
+                            database.transaction { insert(mediaMetadata) }
+                            val downloadRequest =
+                                DownloadRequest
+                                    .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
+                                    .setCustomCacheKey(mediaMetadata.id)
+                                    .setData(mediaMetadata.title.toByteArray())
+                                    .build()
+                            DownloadService.sendAddDownload(
+                                context,
+                                ExoDownloadService::class.java,
+                                downloadRequest,
+                                false,
+                            )
+                        }
+                    }
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        val contentDescription = stringResource(R.string.action_download)
+        when (downloadState) {
+            Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
+                CircularWavyProgressIndicator(
+                    modifier = Modifier.size(iconSize),
+                    color = iconTint,
+                )
+            }
+
+            Download.STATE_COMPLETED -> {
+                Icon(
+                    painter = painterResource(R.drawable.done),
+                    contentDescription = contentDescription,
+                    tint = iconTint,
+                    modifier = Modifier.size(iconSize),
+                )
+            }
+
+            else -> {
+                Icon(
+                    painter = painterResource(R.drawable.download),
+                    contentDescription = contentDescription,
+                    tint = iconTint,
+                    modifier = Modifier.size(iconSize),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun PlayerPlaybackControls(
     playerDesignStyle: PlayerDesignStyle,
     playbackState: Int,
@@ -906,6 +1008,7 @@ fun PlayerPlaybackControls(
 ) {
     val haptic = LocalHapticFeedback.current
     val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val view = LocalView.current
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
 
@@ -1176,6 +1279,14 @@ fun PlayerPlaybackControls(
                             modifier = Modifier.size(22.dp),
                         )
                     }
+
+                    PlayerDownloadButton(
+                        mediaMetadata = mediaMetadata,
+                        shape = RoundedCornerShape(10.dp),
+                        iconSize = 22.dp,
+                        iconTint = textBackgroundColor.copy(alpha = 0.9f),
+                        modifier = Modifier.size(40.dp),
+                    )
                 }
             }
         }
@@ -1375,23 +1486,39 @@ fun PlayerPlaybackControls(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    painter =
-                                        painterResource(
-                                            when (repeatMode) {
-                                                Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
-                                                else -> R.drawable.repeat
-                                            },
-                                        ),
-                                    contentDescription = null,
-                                    tint =
-                                        textBackgroundColor.copy(
-                                            alpha = if (repeatMode == Player.REPEAT_MODE_OFF) 0.6f else 1f,
-                                        ),
-                                    modifier = Modifier.size(smallIcon),
-                                )
-                            }
-                        }
+Icon(
+                                            painter =
+                                                painterResource(
+                                                    when (repeatMode) {
+                                                        Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
+                                                        else -> R.drawable.repeat
+                                                    },
+                                                ),
+                                            contentDescription = null,
+                                            tint =
+                                                textBackgroundColor.copy(
+                                                    alpha =
+                                                        if (repeatMode == Player.REPEAT_MODE_OFF) {
+                                                            0.6f
+                                                        } else {
+                                                            1f
+                                                        },
+                                                ),
+                                            modifier = Modifier.size(smallIcon),
+                                        )
+                                    }
+                                }
+
+                        Spacer(modifier = Modifier.width(gap))
+
+                        PlayerDownloadButton(
+                            mediaMetadata = mediaMetadata,
+                            shape = RoundedCornerShape(smallRadius),
+                            containerColor = textBackgroundColor.copy(alpha = 0.08f),
+                            iconSize = smallIcon,
+                            iconTint = textBackgroundColor.copy(alpha = 0.6f),
+                            modifier = Modifier.size(small),
+                        )
                     }
                 }
             }
@@ -1429,6 +1556,19 @@ fun PlayerPlaybackControls(
                             }
                             playerConnection.player.toggleRepeatMode()
                         },
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    PlayerDownloadButton(
+                        mediaMetadata = mediaMetadata,
+                        iconSize = 22.dp,
+                        iconTint = textBackgroundColor.copy(alpha = 0.9f),
+                        modifier =
+                            Modifier
+                                .size(32.dp)
+                                .padding(4.dp)
+                                .align(Alignment.Center),
                     )
                 }
 
@@ -1759,6 +1899,17 @@ fun PlayerPlaybackControls(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    PlayerDownloadButton(
+                        mediaMetadata = mediaMetadata,
+                        shape = RoundedCornerShape(50),
+                        containerColor = textBackgroundColor.copy(alpha = 0.08f),
+                        iconSize = 20.dp,
+                        iconTint = textBackgroundColor.copy(alpha = 0.5f),
+                        modifier = Modifier.size(40.dp),
+                    )
                 }
             }
         }
@@ -2415,6 +2566,10 @@ private fun V8LandscapeContent(
     onArtistClick: (artistId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resizeMode = remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
+    var availableResolutions by remember { mutableStateOf(emptyList<VideoResolution>()) }
+    var selectedResolutionHeight by remember { mutableStateOf<Int?>(null) }
+
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val horizontalPadding = 36.dp
         val contentGap = 36.dp
@@ -2437,6 +2592,12 @@ private fun V8LandscapeContent(
                 canvasFallbackUrl = canvasFallbackUrl,
                 isPlaying = isPlaying,
                 size = artworkSize,
+                resizeMode = resizeMode,
+                showOverlayControls = true,
+                availableResolutions = availableResolutions,
+                onAvailableResolutions = { availableResolutions = it },
+                selectedResolutionHeight = selectedResolutionHeight,
+                onResolutionSelected = { selectedResolutionHeight = it },
             )
 
             Column(
@@ -2552,8 +2713,16 @@ private fun V8Artwork(
     canvasFallbackUrl: String?,
     isPlaying: Boolean,
     size: androidx.compose.ui.unit.Dp,
+    resizeMode: androidx.compose.runtime.MutableState<Int>? = null,
+    showOverlayControls: Boolean = false,
+    availableResolutions: List<VideoResolution> = emptyList(),
+    onAvailableResolutions: (List<VideoResolution>) -> Unit = {},
+    selectedResolutionHeight: Int? = null,
+    onResolutionSelected: (Int?) -> Unit = {},
 ) {
     val artworkRequest = rememberOfflineArtworkImageRequest(artworkUrl)
+    val hasCanvas = !canvasPrimaryUrl.isNullOrBlank() || !canvasFallbackUrl.isNullOrBlank()
+    val internalResizeMode = resizeMode ?: remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
     Box(
         modifier =
             Modifier
@@ -2568,13 +2737,24 @@ private fun V8Artwork(
             modifier = Modifier.fillMaxSize(),
         )
 
-        if (!canvasPrimaryUrl.isNullOrBlank() || !canvasFallbackUrl.isNullOrBlank()) {
+        if (hasCanvas) {
             CanvasArtworkPlayer(
                 primaryUrl = canvasPrimaryUrl,
                 fallbackUrl = canvasFallbackUrl,
                 isPlaying = isPlaying,
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                resizeMode = internalResizeMode,
+                selectedResolutionHeight = selectedResolutionHeight,
+                onAvailableResolutions = onAvailableResolutions,
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (showOverlayControls && hasCanvas) {
+            VideoPlayerOverlayControls(
+                resizeMode = internalResizeMode,
+                availableResolutions = availableResolutions,
+                selectedResolutionHeight = selectedResolutionHeight,
+                onResolutionSelected = onResolutionSelected,
             )
         }
     }
@@ -3316,6 +3496,10 @@ private fun V9LandscapeContent(
     onArtistClick: (artistId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resizeMode = remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
+    var availableResolutions by remember { mutableStateOf(emptyList<VideoResolution>()) }
+    var selectedResolutionHeight by remember { mutableStateOf<Int?>(null) }
+
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val artworkSize =
             (maxHeight * 0.74f)
@@ -3337,6 +3521,12 @@ private fun V9LandscapeContent(
                 isPlaying = isPlaying,
                 size = artworkSize,
                 placeholderColor = textButtonColor.copy(alpha = 0.12f),
+                resizeMode = resizeMode,
+                showOverlayControls = true,
+                availableResolutions = availableResolutions,
+                onAvailableResolutions = { availableResolutions = it },
+                selectedResolutionHeight = selectedResolutionHeight,
+                onResolutionSelected = { selectedResolutionHeight = it },
             )
 
             Column(
@@ -3498,8 +3688,16 @@ private fun V9Artwork(
     isPlaying: Boolean,
     size: Dp,
     placeholderColor: Color,
+    resizeMode: androidx.compose.runtime.MutableState<Int>? = null,
+    showOverlayControls: Boolean = false,
+    availableResolutions: List<VideoResolution> = emptyList(),
+    onAvailableResolutions: (List<VideoResolution>) -> Unit = {},
+    selectedResolutionHeight: Int? = null,
+    onResolutionSelected: (Int?) -> Unit = {},
 ) {
     val artworkRequest = rememberOfflineArtworkImageRequest(artworkUrl)
+    val hasCanvas = !canvasPrimaryUrl.isNullOrBlank() || !canvasFallbackUrl.isNullOrBlank()
+    val internalResizeMode = resizeMode ?: remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
     Box(
         modifier =
             Modifier
@@ -3514,13 +3712,24 @@ private fun V9Artwork(
             modifier = Modifier.fillMaxSize(),
         )
 
-        if (!canvasPrimaryUrl.isNullOrBlank() || !canvasFallbackUrl.isNullOrBlank()) {
+        if (hasCanvas) {
             CanvasArtworkPlayer(
                 primaryUrl = canvasPrimaryUrl,
                 fallbackUrl = canvasFallbackUrl,
                 isPlaying = isPlaying,
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                resizeMode = internalResizeMode,
+                selectedResolutionHeight = selectedResolutionHeight,
+                onAvailableResolutions = onAvailableResolutions,
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (showOverlayControls && hasCanvas) {
+            VideoPlayerOverlayControls(
+                resizeMode = internalResizeMode,
+                availableResolutions = availableResolutions,
+                selectedResolutionHeight = selectedResolutionHeight,
+                onResolutionSelected = onResolutionSelected,
             )
         }
     }

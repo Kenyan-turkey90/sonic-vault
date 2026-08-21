@@ -1531,7 +1531,7 @@ class MainActivity : ComponentActivity() {
                         com.sonicvault.app.ui.component.LocalMenuState provides menuState,
                     ) {
                         val videoModeActive by
-                            (LocalPlayerConnection.current?.service?.videoModeEnabled ?: remember { MutableStateFlow(false) })
+                            (LocalPlayerConnection.current?.videoOverlayShown ?: remember { MutableStateFlow(false) })
                                 .collectAsStateWithLifecycle()
                         Row {
                             AnimatedVisibility(

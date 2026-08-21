@@ -43,7 +43,7 @@ fun String.asBuildConfigString(): String =
             .replace("\t", "\\t")
     }\""
 
-val fallbackDataServerUrl = "archive-tune-admin-remote.vercel.app"
+val fallbackDataServerUrl = "https://archive-tune-admin-remote.vercel.app"
 val dataServerUrl =
     rootProject
         .file("DataServer.txt")
@@ -105,8 +105,8 @@ android {
     applicationId = "com.sonicvault.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 151
-        versionName = "14.0.12"
+        versionCode = 152
+        versionName = "14.0.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -142,6 +142,24 @@ android {
 
         buildConfigField("String", "DATA_SERVER_URL", dataServerUrl.asBuildConfigString())
         buildConfigField("String", "API_BEARER_TOKEN", apiBearerToken.asBuildConfigString())
+
+        val youtubeTranscriptKey =
+            localProperties.getProperty("YOUTUBE_TRANSCRIPT_KEY")
+                ?: System.getenv("YOUTUBE_TRANSCRIPT_KEY")
+                ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX3"
+        buildConfigField("String", "YOUTUBE_TRANSCRIPT_KEY", "\"$youtubeTranscriptKey\"")
+
+        val youtubeBotguardKey =
+            localProperties.getProperty("YOUTUBE_BOTGUARD_KEY")
+                ?: System.getenv("YOUTUBE_BOTGUARD_KEY")
+                ?: "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
+        buildConfigField("String", "YOUTUBE_BOTGUARD_KEY", "\"$youtubeBotguardKey\"")
+
+        val youtubeBotguardRequestKey =
+            localProperties.getProperty("YOUTUBE_BOTGUARD_REQUEST_KEY")
+                ?: System.getenv("YOUTUBE_BOTGUARD_REQUEST_KEY")
+                ?: "O43z0dpjhgX20SCx4KAo"
+        buildConfigField("String", "YOUTUBE_BOTGUARD_REQUEST_KEY", "\"$youtubeBotguardRequestKey\"")
 
         val nightlyBuildHash =
             (
@@ -251,7 +269,7 @@ android {
     }
 
     compileOptions {
-        isCoreLibraryDesugaringEnabled = false
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
@@ -263,15 +281,15 @@ android {
     }
 
     dependenciesInfo {
-        includeInApk = false
-        includeInBundle = false
+        includeInApk = true
+        includeInBundle = true
     }
 
     lint {
         lintConfig = file("lint.xml")
-        warningsAsErrors = false
-        abortOnError = false
-        checkDependencies = false
+        warningsAsErrors = true
+        abortOnError = true
+        checkDependencies = true
     }
 
     androidResources {
@@ -351,9 +369,9 @@ dependencies {
     implementation(libs.shimmer)
 
     // Glance Widget support
-    implementation("androidx.glance:glance:1.1.1")
-    implementation("androidx.glance:glance-appwidget:1.1.1")
-    implementation("androidx.glance:glance-material3:1.1.1")
+    implementation(libs.glance)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 
     implementation(libs.media3)
     implementation("androidx.media3:media3-exoplayer-hls:${libs.versions.media3.get()}")

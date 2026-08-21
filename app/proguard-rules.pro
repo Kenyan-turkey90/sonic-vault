@@ -83,16 +83,9 @@
 -keepattributes *Annotation*
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
-
-## Logging (does not affect Timber)
--assumenosideeffects class android.util.Log {
-    public static boolean isLoggable(java.lang.String, int);
-    public static int v(...);
-    public static int d(...);
-    ## Leave in release builds
-    #public static int i(...);
-    #public static int w(...);
-    #public static int e(...);
+-assumenosideeffects class java.io.PrintStream {
+    public void println(...);
+    public void print(...);
 }
 
 # Generated automatically by the Android Gradle plugin.
@@ -105,6 +98,12 @@
 
 # Keep all classes within the kuromoji package
 -keep class com.atilika.kuromoji.** { *; }
+
+## BotGuard / PoToken
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.sonicvault.app.utils.potoken.BotGuardTokenGenerator$BotGuardEngine { *; }
 
 ## Queue Persistence Rules
 # Keep queue-related classes to prevent serialization issues in release builds

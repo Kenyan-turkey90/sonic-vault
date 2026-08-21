@@ -64,6 +64,8 @@ class InnerTube {
     @Volatile
     private var authState: PlaybackAuthState = PlaybackAuthState.EMPTY
 
+    var transcriptApiKey: String = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX3"
+
     var visitorData: String?
         get() = authState.visitorData
         set(value) {
@@ -517,7 +519,7 @@ class InnerTube {
         videoId: String,
     ) = withRetry {
         httpClient.post("https://music.youtube.com/youtubei/v1/get_transcript") {
-            parameter("key", "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX3")
+            parameter("key", transcriptApiKey)
             headers {
                 append("Content-Type", "application/json")
             }

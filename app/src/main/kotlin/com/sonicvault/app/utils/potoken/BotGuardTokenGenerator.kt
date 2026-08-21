@@ -70,8 +70,8 @@ object BotGuardTokenGenerator {
     private const val TAG = "BotGuardTokenGen"
     private const val CREATE_URL = "https://www.youtube.com/api/jnn/v1/Create"
     private const val GENERATE_IT_URL = "https://www.youtube.com/api/jnn/v1/GenerateIT"
-    private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
-    private const val API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
+    private const val REQUEST_KEY = com.sonicvault.app.BuildConfig.YOUTUBE_BOTGUARD_REQUEST_KEY
+    private const val API_KEY = com.sonicvault.app.BuildConfig.YOUTUBE_BOTGUARD_KEY
     private const val WV_USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3"
     private const val JS_BRIDGE = "BotGuardBridge"

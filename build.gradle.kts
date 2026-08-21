@@ -9,11 +9,11 @@ plugins {
 }
 
 // Static analysis: only the rules explicitly enabled in detekt.yml run (no default ruleset).
-// Failures are reported but do not break the build yet — see the `detekt` CI job.
+// Failures will break the build to enforce code quality.
 subprojects {
     plugins.withId("io.gitlab.arturbosch.detekt") {
         extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
-            ignoreFailures = true
+            ignoreFailures = false
             config.setFrom(rootProject.file("detekt.yml"))
         }
     }

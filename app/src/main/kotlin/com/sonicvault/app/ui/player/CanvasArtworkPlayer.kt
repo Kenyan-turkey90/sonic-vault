@@ -14,7 +14,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -30,10 +32,13 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.compose.ContentFrame
@@ -49,13 +54,25 @@ import java.util.Locale
 private const val CanvasPlaybackStallCheckIntervalMs = 1_000L
 private const val CanvasPlaybackStallTimeoutMs = 5_000L
 
+/** Describes an available video resolution track. */
+data class VideoResolution(
+    val height: Int,
+    val trackGroupIndex: Int,
+    val trackIndexInGroup: Int,
+) {
+    val label: String
+        get() = "${height}p"
+}
+
 @Composable
 internal fun CanvasArtworkPlayer(
     primaryUrl: String?,
     fallbackUrl: String?,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
-    resizeMode: Int = AspectRatioFrameLayout.RESIZE_MODE_FIT,
+    resizeMode: MutableState<Int> = remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) },
+    selectedResolutionHeight: Int? = null,
+    onAvailableResolutions: (List<VideoResolution>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -64,7 +81,9 @@ internal fun CanvasArtworkPlayer(
     val initial = primary ?: fallback ?: return
     var currentUrl by remember(initial) { mutableStateOf(initial) }
     var isVideoReady by remember(initial) { mutableStateOf(false) }
+    var videoFailed by remember(initial) { mutableStateOf(false) }
     val shouldPlay by rememberUpdatedState(isPlaying)
+    val currentResizeMode by resizeMode
 
     val okHttpClient =
         remember {
@@ -113,12 +132,17 @@ internal fun CanvasArtworkPlayer(
         remember(context) {
             DefaultRenderersFactory(context).setEnableDecoderFallback(true)
         }
+    val trackSelector =
+        remember(context) {
+            DefaultTrackSelector(context)
+        }
     val exoPlayer =
-        remember(initial, mediaSourceFactory, renderersFactory) {
+        remember(initial, mediaSourceFactory, renderersFactory, trackSelector) {
             ExoPlayer
                 .Builder(context)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setRenderersFactory(renderersFactory)
+                .setTrackSelector(trackSelector)
                 .build()
                 .apply {
                     trackSelectionParameters =
@@ -131,6 +155,72 @@ internal fun CanvasArtworkPlayer(
                     playWhenReady = isPlaying
                 }
         }
+
+    // Discover available video resolutions when tracks change
+    DisposableEffect(exoPlayer) {
+        val listener =
+            object : Player.Listener {
+                override fun onTracksChanged(tracks: Tracks) {
+                    val resolutions = mutableListOf<VideoResolution>()
+                    for (groupIndex in 0 until tracks.groups.size) {
+                        val group = tracks.groups[groupIndex]
+                        if (group.type == C.TRACK_TYPE_VIDEO) {
+                            for (trackIndex in 0 until group.length) {
+                                val format = group.getTrackFormat(trackIndex)
+                                val height = format.height
+                                if (height > 0) {
+                                    resolutions.add(
+                                        VideoResolution(
+                                            height = height,
+                                            trackGroupIndex = groupIndex,
+                                            trackIndexInGroup = trackIndex,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    onAvailableResolutions(resolutions.sortedByDescending { it.height })
+                }
+            }
+        exoPlayer.addListener(listener)
+        onDispose { exoPlayer.removeListener(listener) }
+    }
+
+    // Apply resolution override when selectedResolutionHeight changes
+    LaunchedEffect(selectedResolutionHeight, exoPlayer) {
+        if (selectedResolutionHeight == null) {
+            // Back to Auto: clear any manual video track override
+            exoPlayer.trackSelectionParameters =
+                exoPlayer.trackSelectionParameters
+                    .buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+                    .build()
+            return@LaunchedEffect
+        }
+
+        val mappedTrackInfo = trackSelector.currentMappedTrackInfo ?: return@LaunchedEffect
+        for (rendererIndex in 0 until mappedTrackInfo.rendererCount) {
+            if (mappedTrackInfo.getRendererType(rendererIndex) != C.TRACK_TYPE_VIDEO) continue
+            val trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex)
+            for (groupIndex in 0 until trackGroups.length) {
+                val group = trackGroups[groupIndex]
+                for (trackIndex in 0 until group.length) {
+                    val format = group.getFormat(trackIndex)
+                    if (format.height == selectedResolutionHeight) {
+                        val override =
+                            TrackSelectionOverride(group, listOf(trackIndex))
+                        exoPlayer.trackSelectionParameters =
+                            exoPlayer.trackSelectionParameters
+                                .buildUpon()
+                                .setOverrideForType(override)
+                                .build()
+                        return@LaunchedEffect
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(isPlaying) {
         exoPlayer.setCanvasPlayback(isPlaying)
@@ -196,6 +286,8 @@ internal fun CanvasArtworkPlayer(
                     if (!next.isNullOrBlank()) {
                         currentUrl = next
                         isVideoReady = false
+                    } else {
+                        videoFailed = true
                     }
                 }
 
@@ -233,6 +325,7 @@ internal fun CanvasArtworkPlayer(
     LaunchedEffect(currentUrl, exoPlayer) {
         val normalized = currentUrl.trim()
         isVideoReady = false
+        videoFailed = false
         val lowercaseUrl = normalized.lowercase(Locale.ROOT)
         val mimeType =
             when {
@@ -268,17 +361,19 @@ internal fun CanvasArtworkPlayer(
         label = "canvasAlpha",
     )
 
-    ContentFrame(
-        player = exoPlayer,
-        surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
-        contentScale = resizeMode.toContentScale(),
-        keepContentOnReset = false,
-        shutter = {},
-        modifier = modifier.alpha(alpha),
-    )
+    if (!videoFailed) {
+        ContentFrame(
+            player = exoPlayer,
+            surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
+            contentScale = currentResizeMode.toContentScale(),
+            keepContentOnReset = false,
+            shutter = {},
+            modifier = modifier.alpha(alpha),
+        )
+    }
 }
 
-private fun Int.toContentScale(): ContentScale =
+internal fun Int.toContentScale(): ContentScale =
     when (this) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> ContentScale.Crop
 
@@ -286,6 +381,10 @@ private fun Int.toContentScale(): ContentScale =
 
         AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH,
         AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT,
+        -> ContentScale.FillBounds
+
+        RESIZE_MODE_STRETCH -> ContentScale.FillBounds
+
         AspectRatioFrameLayout.RESIZE_MODE_FIT,
         -> ContentScale.Fit
 

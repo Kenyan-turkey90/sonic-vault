@@ -29,6 +29,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -36,6 +37,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -97,6 +99,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -116,6 +119,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
@@ -466,6 +471,7 @@ fun BottomSheetPlayer(
 
     val aodModeEnabled by playerConnection.aodModeEnabled.collectAsStateWithLifecycle()
     val videoModeEnabled by playerConnection.service.videoModeEnabled.collectAsState()
+    val videoOverlayShown by playerConnection.videoOverlayShown.collectAsStateWithLifecycle()
     val videoModeAvailable =
         remember(mediaMetadata) {
             val id = mediaMetadata?.id
@@ -866,7 +872,7 @@ fun BottomSheetPlayer(
     }
 
     val videoOverlayDragDisabled =
-        videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+        videoModeAvailable && videoOverlayShown && state.isExpandedOrExpanding
 
     BottomSheet(
         state = state,
@@ -1253,10 +1259,19 @@ fun BottomSheetPlayer(
 // distance
 
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .swipeUpToRevealQueue(
+                        queueSheetState = queueSheetState,
+                        enabled =
+                            state.isExpandedOrExpanding &&
+                                !videoOverlayDragDisabled &&
+                                !queueSheetState.isExpandedOrExpanding,
+                    ),
         ) {
         val videoOverlayActive =
-            videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+            videoModeAvailable && videoOverlayShown && state.isExpandedOrExpanding
         if (!videoOverlayActive) {
         when (LocalConfiguration.current.orientation) {
             Configuration.ORIENTATION_LANDSCAPE -> {
@@ -1851,11 +1866,17 @@ fun BottomSheetPlayer(
                     },
                     onExit = { playerConnection.service.setVideoModeEnabled(false) },
                 )
-            } else if (!videoModeEnabled && state.isExpanded) {
+            } else if (videoModeAvailable && state.isExpanded && !videoOverlayShown) {
                 VideoModeToggleChip(
                     containerColor = Color.Black.copy(alpha = 0.55f),
                     contentColor = Color.White,
-                    onClick = { playerConnection.service.setVideoModeEnabled(true) },
+                    label =
+                        if (videoModeEnabled) {
+                            stringResource(R.string.switch_to_audio)
+                        } else {
+                            stringResource(R.string.switch_to_video)
+                        },
+                    onClick = { playerConnection.service.setVideoModeEnabled(!videoModeEnabled) },
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
@@ -1864,6 +1885,8 @@ fun BottomSheetPlayer(
                 )
             }
         }
+
+        SwipeRevealFlicker(queueSheetState)
         }
 
         val queueOnBackgroundColor = if (useBlackBackground) Color.White else MaterialTheme.colorScheme.onSurface
@@ -1884,7 +1907,7 @@ fun BottomSheetPlayer(
             }
 
         val queueHiddenByVideo =
-            videoModeAvailable && videoModeEnabled && state.isExpandedOrExpanding && !aodModeEnabled
+            videoModeAvailable && videoOverlayShown && state.isExpandedOrExpanding
         if (!queueHiddenByVideo) {
             Queue(
                 state = queueSheetState,
@@ -2507,11 +2530,12 @@ private fun V7PlayerBackdrop(
                 }
 
                 if (hasCanvas) {
+                    val canvasResizeMode = remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
                     CanvasArtworkPlayer(
                         primaryUrl = backdrop.canvasPrimaryUrl,
                         fallbackUrl = backdrop.canvasFallbackUrl,
                         isPlaying = isPlaying,
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                        resizeMode = canvasResizeMode,
                         modifier = canvasStageModifier,
                     )
                 }
@@ -2823,6 +2847,143 @@ private fun LandscapeLikeBox(
                 }
             }
         }
+    }
+}
+
+private fun Modifier.swipeUpToRevealQueue(
+    queueSheetState: BottomSheetState,
+    enabled: Boolean,
+): Modifier =
+    composed {
+        pointerInput(queueSheetState, enabled) {
+            if (!enabled) return@pointerInput
+
+            val touchSlop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down =
+                    awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial,
+                    )
+                if (down.isConsumed) return@awaitEachGesture
+                val pointerId = down.id
+
+                val velocityTracker = VelocityTracker()
+                var totalY = 0f
+                var opened = false
+
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == pointerId } ?: continue
+
+                    if (opened) {
+                        velocityTracker.addPointerInputChange(change)
+                        queueSheetState.dispatchRawDelta(change.position.y - change.previousPosition.y)
+                        if (!change.pressed) {
+                            val velocity = -velocityTracker.calculateVelocity().y
+                            velocityTracker.resetTracking()
+                            queueSheetState.performFling(velocity, null)
+                            break
+                        }
+                        change.consume()
+                    } else {
+                        if (change.isConsumed) break
+                        totalY += change.position.y - change.previousPosition.y
+                        if (totalY <= -touchSlop) {
+                            opened = true
+                            velocityTracker.addPointerInputChange(change)
+                            queueSheetState.dispatchRawDelta(totalY)
+                            if (!change.pressed) {
+                                queueSheetState.performFling(-velocityTracker.calculateVelocity().y, null)
+                                break
+                            }
+                            change.consume()
+                        } else if (totalY >= touchSlop) {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+@Composable
+private fun SwipeRevealFlicker(
+    state: BottomSheetState,
+    modifier: Modifier = Modifier,
+) {
+    val progress = state.progress
+    val reveal = progress.coerceIn(0f, 1f)
+    if (reveal <= 0.001f) return
+
+    val accent = MaterialTheme.colorScheme.primary
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val edgeY = h * (1f - reveal)
+
+        val rise = ((reveal - 0.20f) / 0.22f).coerceIn(0f, 1f)
+        val decay = (1f - ((reveal - 0.52f) / 0.45f)).coerceIn(0f, 1f)
+        val pulse = rise * decay
+        if (pulse <= 0.003f) return@Canvas
+
+        drawRect(
+            brush =
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to Color.Black.copy(alpha = 0.16f * pulse),
+                            ((edgeY * 0.5f) / h) to Color.Black.copy(alpha = 0.05f * pulse),
+                            (edgeY / h) to Color.Transparent,
+                        ),
+                ),
+        )
+
+        val streakCount = 5
+        val streakWidth = w * 0.45f
+        for (i in 0 until streakCount) {
+            val t = i / (streakCount - 1).toFloat()
+            val y = edgeY * (1f - 0.22f * t)
+            val alpha = (1f - t) * pulse * 0.26f
+            if (alpha <= 0.003f) continue
+            drawRect(
+                color = accent.copy(alpha = alpha),
+                topLeft = Offset(streakWidth * 0.25f + t * 0.4f * w, y),
+                size = Size(streakWidth, 1.5.dp.toPx()),
+            )
+        }
+
+        val seamHeight = 2.5.dp.toPx()
+        val seamTop = (edgeY - seamHeight).coerceAtLeast(0f)
+        val seamBottom = (edgeY + seamHeight).coerceAtMost(h)
+        drawRect(
+            brush =
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to accent.copy(alpha = 0f),
+                            0.5f to Color.White.copy(alpha = (0.9f * pulse).coerceAtLeast(0.15f)),
+                            1f to accent.copy(alpha = 0f),
+                        ),
+                    startY = seamTop,
+                    endY = seamBottom,
+                ),
+            topLeft = Offset(0f, seamTop),
+            size = Size(w, seamBottom - seamTop),
+        )
+
+        drawRect(
+            brush =
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to accent.copy(alpha = 0f),
+                            ((edgeY / h) - 0.12f).coerceAtLeast(0f) to accent.copy(alpha = 0.22f * pulse),
+                            (edgeY / h) to Color.Transparent,
+                        ),
+                ),
+        )
     }
 }
 

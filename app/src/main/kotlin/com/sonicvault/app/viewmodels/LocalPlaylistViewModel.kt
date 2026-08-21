@@ -81,7 +81,7 @@ class LocalPlaylistViewModel
         private val removePlaylistCover: RemovePlaylistCoverUseCase,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        val playlistId = savedStateHandle.get<String>("playlistId")!!
+        val playlistId = savedStateHandle.get<String>("playlistId") ?: ""
         val playlist =
             database
                 .playlist(playlistId)

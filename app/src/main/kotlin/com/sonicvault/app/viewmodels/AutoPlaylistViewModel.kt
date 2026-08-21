@@ -48,7 +48,7 @@ class AutoPlaylistViewModel
         savedStateHandle: SavedStateHandle,
         private val syncUtils: SyncUtils,
     ) : ViewModel() {
-        val playlist = savedStateHandle.get<String>("playlist")!!
+        val playlist = savedStateHandle.get<String>("playlist") ?: ""
 
         private val _isRefreshing = MutableStateFlow(false)
         val isRefreshing = _isRefreshing.asStateFlow()

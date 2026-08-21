@@ -38,7 +38,7 @@ class YouTubeBrowseViewModel
         private val loadAiContentFilterPolicy: LoadAiContentFilterPolicyUseCase,
         private val filterAiContent: FilterAiContentUseCase,
     ) : ViewModel() {
-        private val browseId = savedStateHandle.get<String>("browseId")!!
+        private val browseId = savedStateHandle.get<String>("browseId") ?: ""
         private val params = savedStateHandle.get<String>("params")
 
         val result = MutableStateFlow<BrowseResult?>(null)

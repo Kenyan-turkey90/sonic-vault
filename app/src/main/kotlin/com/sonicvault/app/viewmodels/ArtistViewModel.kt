@@ -106,7 +106,7 @@ class ArtistViewModel
         private val setArtistBlocked: SetArtistBlockedUseCase,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        val artistId = savedStateHandle.get<String>("artistId")!!
+        val artistId = savedStateHandle.get<String>("artistId") ?: ""
         var artistPage by mutableStateOf<ArtistPage?>(null)
         private val eventChannel = Channel<ArtistEvent>(capacity = Channel.BUFFERED)
         val events = eventChannel.receiveAsFlow()

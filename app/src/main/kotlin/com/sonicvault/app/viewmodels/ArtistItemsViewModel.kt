@@ -39,7 +39,7 @@ class ArtistItemsViewModel
         private val database: MusicDatabase,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val browseId = savedStateHandle.get<String>("browseId")!!
+        private val browseId = savedStateHandle.get<String>("browseId") ?: ""
         private val params =
             savedStateHandle
                 .get<String>("params")

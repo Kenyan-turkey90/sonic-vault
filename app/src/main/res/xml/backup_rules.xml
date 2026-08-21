@@ -9,4 +9,16 @@
     <exclude
         domain="database"
         path="exoplayer_internal.db" />
+    <exclude
+        domain="sharedpref"
+        path="." />
+    <exclude
+        domain="file"
+        path="datastore" />
+    <exclude
+        domain="file"
+        path="no_backup" />
+    <exclude
+        domain="database"
+        path="." />
 </full-backup-content>

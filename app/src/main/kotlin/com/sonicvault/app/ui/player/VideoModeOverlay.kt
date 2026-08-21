@@ -38,9 +38,11 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import com.sonicvault.app.R
@@ -142,6 +146,73 @@ internal fun VideoModeOverlay(
         LocalConfiguration.current.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+    // Resize mode + resolution controls for the fullscreen video surface.
+    // These work on any design style, not just V8/V9.
+    val resizeMode = remember { mutableIntStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var availableResolutions by remember { mutableStateOf(emptyList<VideoResolution>()) }
+    var selectedResolutionHeight by remember { mutableStateOf<Int?>(null) }
+
+    // Discover available video resolutions from the live player's tracks.
+    DisposableEffect(player) {
+        val listener =
+            object : Player.Listener {
+                override fun onTracksChanged(tracks: Tracks) {
+                    val resolutions = mutableListOf<VideoResolution>()
+                    for (groupIndex in 0 until tracks.groups.size) {
+                        val group = tracks.groups[groupIndex]
+                        if (group.type == C.TRACK_TYPE_VIDEO) {
+                            for (trackIndex in 0 until group.length) {
+                                val format = group.getTrackFormat(trackIndex)
+                                val height = format.height
+                                if (height > 0) {
+                                    resolutions.add(
+                                        VideoResolution(
+                                            height = height,
+                                            trackGroupIndex = groupIndex,
+                                            trackIndexInGroup = trackIndex,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    availableResolutions = resolutions.sortedByDescending { it.height }
+                }
+            }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
+    // Apply the manual resolution override to the main player when the picker changes.
+    LaunchedEffect(selectedResolutionHeight, player) {
+        if (selectedResolutionHeight == null) {
+            player.trackSelectionParameters =
+                player.trackSelectionParameters
+                    .buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+                    .build()
+            return@LaunchedEffect
+        }
+        val tracks = player.currentTracks
+        for (groupIndex in 0 until tracks.groups.size) {
+            val group = tracks.groups[groupIndex]
+            if (group.type != C.TRACK_TYPE_VIDEO) continue
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                if (format.height == selectedResolutionHeight) {
+                    val override =
+                        TrackSelectionOverride(group.mediaTrackGroup, listOf(trackIndex))
+                    player.trackSelectionParameters =
+                        player.trackSelectionParameters
+                            .buildUpon()
+                            .setOverrideForType(override)
+                            .build()
+                    return@LaunchedEffect
+                }
+            }
+        }
+    }
+
     // Auto-hide the controls only in fullscreen (landscape) after a few seconds of
     // inactivity. In portrait the controls stay visible.
     var controlsLastInteractedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -196,7 +267,7 @@ internal fun VideoModeOverlay(
         ContentFrame(
             player = player,
             surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
-            contentScale = ContentScale.Fit,
+            contentScale = resizeMode.intValue.toContentScale(),
             keepContentOnReset = false,
             shutter = {},
             modifier = Modifier.fillMaxSize(),
@@ -325,6 +396,19 @@ internal fun VideoModeOverlay(
             }
         }
 
+        // Resize mode + quality overlay (below the exit chip on the top-right).
+        VideoPlayerOverlayControls(
+            resizeMode = resizeMode,
+            availableResolutions = availableResolutions,
+            selectedResolutionHeight = selectedResolutionHeight,
+            onResolutionSelected = { selectedResolutionHeight = it },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 76.dp, end = 8.dp),
+        )
+
         // Bottom overlay: progress bar + transport controls (below the video).
         // Centered with a bounded width so it reads as a compact block in both orientations.
         Box(
@@ -431,7 +515,7 @@ internal fun VideoModeOverlay(
                     contentDescription = stringResource(R.string.next),
                     onClick = onSkipNext,
                 )
-                VideoOverlayControl(
+VideoOverlayControl(
                     iconRes =
                         when (repeatMode) {
                             Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
@@ -449,12 +533,20 @@ internal fun VideoModeOverlay(
                             Color.White
                         },
                 )
+                PlayerDownloadButton(
+                    mediaMetadata = mediaMetadata,
+                    shape = CircleShape,
+                    containerColor = Color.Black.copy(alpha = 0.55f),
+                    iconSize = 26.dp,
+                    iconTint = Color.White,
+                    modifier = Modifier.size(52.dp),
+                )
             }
         }
         }
         }
-        }
     }
+}
 }
 
 private fun formatDuration(durationMs: Long): String {

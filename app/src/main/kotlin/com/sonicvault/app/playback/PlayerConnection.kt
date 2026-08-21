@@ -8,10 +8,12 @@
 package com.sonicvault.app.playback
 
 import android.content.Context
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM
 import androidx.media3.common.Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
 import androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
@@ -111,6 +113,18 @@ class PlayerConnection(
 
     val aodModeEnabled = MutableStateFlow(false)
 
+    val hasVideoTrack = MutableStateFlow(player.hasCurrentVideoTrack())
+    private val isBuffering = MutableStateFlow(player.playbackState == Player.STATE_BUFFERING)
+    val videoOverlayShown =
+        combine(
+            service.videoModeEnabled,
+            hasVideoTrack,
+            isBuffering,
+            aodModeEnabled,
+        ) { videoMode, hasVideo, buffering, aod ->
+            videoMode && !aod && (hasVideo || buffering)
+        }.stateIn(scope, SharingStarted.Lazily, false)
+
     val error = MutableStateFlow<PlaybackException?>(null)
     private var dismissedPlaybackError: PlaybackException? = null
     val waitingForNetworkConnection = service.waitingForNetworkConnection
@@ -130,6 +144,7 @@ class PlayerConnection(
 
         playbackState.value = player.playbackState
         playWhenReady.value = player.playWhenReady
+        isBuffering.value = player.playbackState == Player.STATE_BUFFERING
         playbackParameters.value = player.playbackParameters
         queueTitle.value = service.queueTitle
         queueWindows.value = player.getQueueWindows()
@@ -342,6 +357,7 @@ class PlayerConnection(
 
     override fun onPlaybackStateChanged(state: Int) {
         playbackState.value = state
+        isBuffering.value = state == Player.STATE_BUFFERING
         updatePlaybackError(player.playerError)
     }
 
@@ -354,6 +370,10 @@ class PlayerConnection(
 
     override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
         this.playbackParameters.value = playbackParameters
+    }
+
+    override fun onTracksChanged(tracks: Tracks) {
+        hasVideoTrack.value = player.hasCurrentVideoTrack()
     }
 
     override fun onMediaItemTransition(
@@ -431,3 +451,6 @@ class PlayerConnection(
         metadataExtractionJob = null
     }
 }
+
+private fun Player.hasCurrentVideoTrack(): Boolean =
+    currentTracks.groups.any { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }

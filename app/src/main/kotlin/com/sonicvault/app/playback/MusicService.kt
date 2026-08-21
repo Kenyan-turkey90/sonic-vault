@@ -127,6 +127,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import com.sonicvault.app.MainActivity
 import com.sonicvault.app.R
 import com.sonicvault.app.aod.ACTION_AOD_MODE
@@ -2284,7 +2285,8 @@ class MusicService :
                     Timber.tag("MusicService").d("Discord RPC disabled → stopping presence manager")
                     try {
                         DiscordPresenceManager.stop()
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Timber.tag("MusicService").w(e, "Failed to stop DiscordPresenceManager (disabled)")
                     }
                     lastPresenceToken = null
                 }
@@ -2297,7 +2299,8 @@ class MusicService :
                     Timber.tag("MusicService").d("No Discord OAuth session -> stopping presence manager")
                     try {
                         DiscordPresenceManager.stop()
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Timber.tag("MusicService").w(e, "Failed to stop DiscordPresenceManager (no token)")
                     }
                     lastPresenceToken = null
                 }
@@ -3437,7 +3440,8 @@ class MusicService :
         if (!bluetoothReceiverRegistered) return
         try {
             unregisterReceiver(bluetoothReceiver)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to unregister Bluetooth receiver")
         }
         bluetoothReceiverRegistered = false
     }
@@ -5712,19 +5716,22 @@ class MusicService :
 
         try {
             togetherClient?.disconnect()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to disconnect TogetherClient")
         }
         togetherClient = null
 
         try {
             togetherOnlineHost?.disconnect()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to disconnect TogetherOnlineHost")
         }
         togetherOnlineHost = null
 
         try {
             togetherServer?.stop()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to stop TogetherServer")
         }
         togetherServer = null
     }
@@ -6116,19 +6123,23 @@ class MusicService :
         audioEffectsSessionId = null
         try {
             equalizer?.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release Equalizer")
         }
         try {
             bassBoost?.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release BassBoost")
         }
         try {
             virtualizer?.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release Virtualizer")
         }
         try {
             loudnessEnhancer?.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release LoudnessEnhancer")
         }
         equalizer = null
         bassBoost = null
@@ -6984,7 +6995,8 @@ class MusicService :
                         }
 
                         // Last.fm now playing - handled by ScrobbleManager
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Timber.tag("MusicService").w(e, "ListenBrainz/LFM now-playing submission failed (transition)")
                     }
                 } catch (e: Exception) {
                     Timber.tag("MusicService").v(e, "timeline/position follow-up work failed")
@@ -7050,7 +7062,8 @@ class MusicService :
                         }
 
                         // Last.fm now playing - handled by ScrobbleManager
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Timber.tag("MusicService").w(e, "ListenBrainz/LFM now-playing submission failed (isPlaying)")
                     }
                 } catch (e: Exception) {
                     Timber.tag("MusicService").v(e, "isPlaying/mediaTransition follow-up work failed")
@@ -8263,7 +8276,8 @@ class MusicService :
                             Timber.tag("MusicService").v(ie, "ListenBrainz finished submit failed")
                         }
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Timber.tag("MusicService").w(e, "ListenBrainz scrobble submission failed on playback stats")
                 }
             }
         }
@@ -8587,47 +8601,57 @@ class MusicService :
         if (aodScreenOffReceiver != null) {
             try {
                 unregisterReceiver(aodScreenOffReceiver)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Timber.tag("MusicService").w(e, "Failed to unregister AOD screen-off receiver")
             }
             aodScreenOffReceiver = null
         }
         try {
             scope.launch { stopTogetherInternal() }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to stop Together session on destroy")
         }
         try {
             connectivityObserver.unregister()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to unregister ConnectivityObserver")
         }
         lyricsPreloadManager?.destroy()
         lyricsPreloadManager = null
         abandonAudioFocus()
         try {
             releaseAudioEffects()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release audio effects on destroy")
         }
         try {
             if (dataStore.get(PersistentQueueKey, true) && player.mediaItemCount > 0) {
                 runBlocking {
-                    saveQueueToDisk()
+                    withTimeoutOrNull(5000L) {
+                        saveQueueToDisk()
+                    }
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").e(e, "Failed to save queue to disk on destroy")
         }
         try {
             mediaSession.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release MediaSession")
         }
         try {
             if (wakeLock?.isHeld == true) wakeLock?.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release wake lock")
         }
         try {
             localPlayer.removeListener(audioEffectPlayerListener)
             player.removeListener(this)
             player.removeListener(sleepTimer)
             player.release()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Failed to release player on destroy")
         }
         if (streamingExtractionManagerDelegate.isInitialized()) {
             runCatching { streamingExtractionManagerDelegate.value.close() }
@@ -8706,7 +8730,8 @@ class MusicService :
             if (dataStore.get(PersistentQueueKey, true) && player.mediaItemCount > 0) {
                 runBlocking { saveQueueToDisk() }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "onTaskRemoved cleanup failed")
         }
     }
 

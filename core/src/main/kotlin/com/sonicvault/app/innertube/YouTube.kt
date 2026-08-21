@@ -137,6 +137,12 @@ object YouTube {
             innerTube.applyAuthState(normalized)
         }
 
+    var transcriptApiKey: String
+        get() = innerTube.transcriptApiKey
+        set(value) {
+            innerTube.transcriptApiKey = value
+        }
+
     var locale: YouTubeLocale
         get() = innerTube.locale
         set(value) {

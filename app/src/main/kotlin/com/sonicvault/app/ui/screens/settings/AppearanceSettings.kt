@@ -41,6 +41,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.Image
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -481,7 +482,7 @@ fun AppearanceSettings(navController: NavController) {
                     PreferenceEntry(
                         title = { Text(stringResource(R.string.app_icon)) },
                         description = stringResource(R.string.app_icon_description),
-                        icon = { Icon(painterResource(R.drawable.app_icon_small), null) },
+                        icon = { Image(painterResource(R.drawable.app_icon_small), null) },
                         onClick = { navController.navigate("settings/appearance/icon") },
                     )
                 }

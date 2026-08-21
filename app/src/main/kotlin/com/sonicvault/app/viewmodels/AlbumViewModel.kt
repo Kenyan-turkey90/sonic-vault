@@ -62,7 +62,7 @@ class AlbumViewModel
         private val database: MusicDatabase,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        val albumId = savedStateHandle.get<String>("albumId")!!
+        val albumId = savedStateHandle.get<String>("albumId") ?: ""
         val playlistId = MutableStateFlow("")
         val albumWithSongs =
             combine(
