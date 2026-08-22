@@ -271,6 +271,7 @@ import com.sonicvault.app.ui.screens.Screens
 import com.sonicvault.app.ui.screens.buildLoginRoute
 import com.sonicvault.app.ui.screens.navigationBuilder
 import com.sonicvault.app.ui.screens.onboarding.OnboardingRoute
+import com.sonicvault.app.ui.screens.SupabaseAuthScreen
 import com.sonicvault.app.ui.screens.search.LocalSearchScreen
 import com.sonicvault.app.ui.screens.search.OnlineSearchResultArgument
 import com.sonicvault.app.ui.screens.search.OnlineSearchResultRoutePrefix
@@ -300,8 +301,10 @@ import com.sonicvault.app.viewmodels.BackupCategory
 import com.sonicvault.app.viewmodels.BackupRestoreViewModel
 import com.sonicvault.app.viewmodels.GatekeeperViewModel
 import com.sonicvault.app.viewmodels.HomeViewModel
-import com.sonicvault.app.viewmodels.NetworkBannerViewModel
 import com.sonicvault.app.viewmodels.NewsViewModel
+import com.sonicvault.app.viewmodels.NetworkBannerViewModel
+import com.sonicvault.app.viewmodels.AuthViewModel
+import com.sonicvault.app.viewmodels.AuthUiState
 import com.sonicvault.app.viewmodels.OnlineSearchSort
 import java.util.Locale
 import javax.inject.Inject
@@ -821,6 +824,20 @@ class MainActivity : ComponentActivity() {
 
                 if (shouldShowOnboarding) {
                     OnboardingRoute(viewModel = onboardingViewModel)
+                    return@SonicVaultTheme
+                }
+
+                // Auth gate: show Supabase login if not signed in
+                val authViewModel: AuthViewModel = hiltViewModel()
+                val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+                val isAuthed = when (authState) {
+                    is AuthUiState.SignedIn -> true
+                    is AuthUiState.CheckingSession -> true
+                    is AuthUiState.Loading -> true
+                    else -> false
+                }
+                if (!isAuthed) {
+                    SupabaseAuthScreen(viewModel = authViewModel, navController = navController)
                     return@SonicVaultTheme
                 }
 

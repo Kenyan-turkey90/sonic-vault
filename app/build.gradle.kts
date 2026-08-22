@@ -434,6 +434,10 @@ dependencies {
     implementation(libs.accompanist.lyrics.core)
 
     implementation("org.json:json:20240303")
+
+    // Supabase Auth
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.ktor)
 }
 
 androidComponents {

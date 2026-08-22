@@ -29,6 +29,7 @@ import com.sonicvault.app.defaultUpdateChannel
 import com.sonicvault.app.musicrecognition.MusicRecognitionRoute
 import com.sonicvault.app.musicrecognition.MusicRecognitionDetailsRoute
 import com.sonicvault.app.ui.screens.BrowseScreen
+import com.sonicvault.app.ui.screens.SupabaseAuthScreen
 import com.sonicvault.app.ui.screens.artist.ArtistAlbumsScreen
 import com.sonicvault.app.ui.screens.artist.ArtistItemsScreen
 import com.sonicvault.app.ui.screens.artist.ArtistScreen
@@ -160,6 +161,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("account") {
         AccountScreen(navController, scrollBehavior)
+    }
+    composable(SUPABASE_AUTH_ROUTE) {
+        SupabaseAuthScreen(navController = navController)
     }
     composable("new_release") {
         NewReleaseScreen(navController, scrollBehavior)
